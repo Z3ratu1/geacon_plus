@@ -3,8 +3,10 @@ golang实现的CobaltStrike beacon
 
 **该项目仅用于对CobaltStrike协议的学习测试，请勿使用于任何非法用途，由此产生的后果自行承担**
 
+请不要将该项目上传vt等平台以延长其存活时间
+
 ## 使用方法
-本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用可参考原项目
+本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
 
 ## 实现功能
 支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
