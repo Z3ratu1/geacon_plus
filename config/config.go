@@ -5,6 +5,12 @@ import (
 )
 
 var (
+	C2    = ""
+	http  = "http://"
+	https = "https://"
+	// change to switch http(s)
+	Host = http + C2
+
 	// RsaPublicKey only used when first send meta info to server
 	RsaPublicKey = []byte(`-----BEGIN PUBLIC KEY-----
 -----END PUBLIC KEY-----`)
@@ -15,7 +21,8 @@ var (
 	VerifySSLCert               = true
 	TimeOut       time.Duration = 30 //seconds
 
-	IV = []byte("plmoknijbqazwsxe")
+	// **YOU SHOULD NEVER CHANGE IT!!!!!**
+	IV = []byte("abcdefghijklmnop")
 	// GlobalKey 16 bytes global key, generate randomly at each execute, send to server when in meta info.
 	// can be changed at each package
 	GlobalKey []byte

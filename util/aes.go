@@ -38,8 +38,8 @@ func AesCBCDecrypt(encryptData, key []byte) ([]byte, error) {
 		panic(err)
 	}
 	blockSize := block.BlockSize()
-	// seems need to padding if base64 payload was returned? not sure what happened, but it really works
-	encryptData = PaddingWithA(encryptData)
+	// seems need to padding if base64 payload was returned?
+	//encryptData = PaddingWithA(encryptData)
 	if len(encryptData) < blockSize {
 		panic("ciphertext too short")
 	}

