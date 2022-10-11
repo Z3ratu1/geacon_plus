@@ -1,10 +1,8 @@
 package command
 
 import (
-	"bytes"
 	"fmt"
 	"golang.org/x/sys/windows"
-	"main/packet"
 	"unsafe"
 )
 
@@ -14,18 +12,6 @@ var (
 	adjustTokenPrivileges   = advapi32.NewProc("AdjustTokenPrivileges")
 	logonUserA              = advapi32.NewProc("LogonUserA")
 )
-
-func ParseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
-	buf := bytes.NewBuffer(b)
-	domain, err := ParseAnArg(buf)
-	username, err := ParseAnArg(buf)
-	password, err := ParseAnArg(buf)
-	cmd, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return domain, username, password, cmd, nil
-}
 
 // TODO verify validity
 func RunAs(domain []byte, username []byte, password []byte, cmd []byte) error {
@@ -42,25 +28,6 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) error {
 		return err
 	}
 	return nil
-}
-
-func ParseGetPrivs(b []byte) ([]string, error) {
-	buf := bytes.NewBuffer(b)
-	privCntByte := make([]byte, 2)
-	_, err := buf.Read(privCntByte)
-	if err != nil {
-		return nil, err
-	}
-	privCnt := int(packet.ReadShort(privCntByte))
-	privs := make([]string, privCnt)
-	for i := 0; i < privCnt; i++ {
-		tmp, err := ParseAnArg(buf)
-		if err != nil {
-			return nil, err
-		}
-		privs[i] = string(tmp)
-	}
-	return privs, nil
 }
 
 func GetPrivs(privs []string) (string, error) {

@@ -13,17 +13,6 @@ import (
 	"strings"
 )
 
-func ParseCommandUpload(b []byte) ([]byte, []byte, error) {
-	buf := bytes.NewBuffer(b)
-	filePath, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	fileContent := buf.Bytes()
-	return filePath, fileContent, nil
-
-}
-
 func Upload(filePath string, fileContent []byte) (int, error) {
 	// normalize path
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
@@ -187,29 +176,12 @@ func Download(filePath string) error {
 
 func Remove(filePath string) error {
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
-	err := os.Remove(filePath)
+	// use RemoveAll to support remove not empty dir
+	err := os.RemoveAll(filePath)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-// can also be used on Copy
-func ParseCommandMove(b []byte) ([]byte, []byte, error) {
-	buf := bytes.NewBuffer(b)
-	src, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	dst, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	return src, dst, nil
-}
-
-func ParseCommandCopy(b []byte) ([]byte, []byte, error) {
-	return ParseCommandMove(b)
 }
 
 func MoveFile(src string, dst string) error {

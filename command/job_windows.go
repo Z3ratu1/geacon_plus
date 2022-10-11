@@ -63,10 +63,10 @@ func GetSpawnProcessX86() (string, string) {
 	var arr []string
 	if sysinfo.IsProcessX64() {
 		path := config.SpawnToX86
-		arr = strings.SplitN(path, " ", 1)
+		arr = strings.SplitN(path, " ", 2)
 	} else {
 		path := strings.Replace(config.SpawnToX86, "syswow64", "system32", 1)
-		arr = strings.SplitN(path, " ", 1)
+		arr = strings.SplitN(path, " ", 2)
 	}
 	program := arr[0]
 	args := ""
@@ -80,10 +80,10 @@ func GetSpawnProcessX64() (string, string) {
 	var arr []string
 	if sysinfo.IsProcessX64() {
 		path := strings.Replace(config.SpawnToX64, "sysnative", "system32", 1)
-		arr = strings.SplitN(path, " ", 1)
+		arr = strings.SplitN(path, " ", 2)
 	} else {
 		path := config.SpawnToX64
-		arr = strings.SplitN(path, " ", 1)
+		arr = strings.SplitN(path, " ", 2)
 	}
 	program := arr[0]
 	args := ""

