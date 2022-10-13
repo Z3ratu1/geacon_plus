@@ -178,6 +178,17 @@ func ParseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
 	return domain, username, password, cmd, err
 }
 
+func ParseInject(b []byte) (uint32, []byte, error) {
+	buf := bytes.NewBuffer(b)
+	pidBytes := make([]byte, 4)
+	_, _ = buf.Read(pidBytes)
+	zeroBytes := make([]byte, 4)
+	_, _ = buf.Read(zeroBytes)
+	pid := packet.ReadInt(pidBytes)
+	dll := buf.Bytes()
+	return pid, dll, nil
+}
+
 func ErrorMessage(err string) {
 	errIdBytes := packet.WriteInt(0) // must be zero
 	arg1Bytes := packet.WriteInt(0)  // for debug

