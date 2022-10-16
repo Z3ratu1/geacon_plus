@@ -5,18 +5,22 @@ import (
 	"runtime"
 )
 
-func RunAs(domain []byte, username []byte, password []byte, cmd []byte) error {
+func RunAs(b []byte) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
 
-func GetPrivs(privs []string) (string, error) {
-	return "", errors.New("unsupported for " + runtime.GOOS)
+func GetPrivsByte(b []byte) error {
+	return errors.New("unsupported for " + runtime.GOOS)
+}
+
+func StealToken(b []byte) error {
+	return errors.New("unsupported for " + runtime.GOOS)
 }
 
 func Rev2self() error {
-	return "", errors.New("unsupported for " + runtime.GOOS)
+	return errors.New("unsupported for " + runtime.GOOS)
 }
 
-func MakeToken(domain []byte, username []byte, password []byte) error {
+func MakeToken(b []byte) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }

