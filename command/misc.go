@@ -47,6 +47,7 @@ const (
 )
 
 // reference https://github.com/mai1zhi2/SharpBeacon/blob/master/Beacon/Profiles/Config.cs
+// https://github.com/WBGlIl/ReBeacon_Src/blob/main/ReBeacon_Src/BeaconTask.cpp
 // https://sec-in.com/article/1554
 // part of them also can be found in cs jar,but I forget where I found them
 // most of the interaction can be found in beacon.Taskbeacon
@@ -67,6 +68,7 @@ const (
 	CMD_TYPE_STEAL_TOKEN               = 31
 	CMD_TYPE_PS                        = 32
 	CMD_TYPE_KILL                      = 33
+	CMD_TYPE_IMPORT_PS                 = 37
 	CMD_TYPE_RUNAS                     = 38
 	CMD_TYPE_PWD                       = 39
 	CMD_TYPE_JOB                       = 40
@@ -84,13 +86,14 @@ const (
 	CMD_TYPE_REMOVE                    = 56
 	CMD_TYPE_UPLOAD_LOOP               = 67
 	CMD_TYPE_SPAWN_TOX64               = 69
-	CMD_TYPE_EXEC_ASM_TOKEN_X86        = 70 // not sure
+	CMD_TYPE_EXEC_ASM_TOKEN_X86        = 70
 	CMD_TYPE_EXEC_ASM_TOKEN_X64        = 71
 	CMD_TYPE_SET_ENV                   = 72
 	CMD_TYPE_FILE_COPY                 = 73
 	CMD_TYPE_FILE_MOVE                 = 74
 	CMD_TYPE_GET_PRIVS                 = 77
 	CMD_TYPE_SHELL                     = 78
+	CMD_TYPE_WEB_DELIVERY              = 79
 	CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X86 = 87
 	CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64 = 88
 	CMD_TYPE_SPAWN_TOKEN_X86           = 89

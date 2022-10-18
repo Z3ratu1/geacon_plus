@@ -1,3 +1,5 @@
+//go:build windows
+
 package command
 
 import (
@@ -126,8 +128,9 @@ func runNative(path string, args string) ([]byte, error) {
 	defer windows.CloseHandle(pI.Process)
 	defer windows.CloseHandle(pI.Thread)
 
-	_, _ = windows.WaitForSingleObject(pI.Process, windows.INFINITE)
-	_, _ = windows.WaitForSingleObject(pI.Thread, windows.INFINITE)
+	// some task like tasklist wouldn't exit
+	_, _ = windows.WaitForSingleObject(pI.Process, 10*1000)
+	_, _ = windows.WaitForSingleObject(pI.Thread, 10*1000)
 
 	buf := make([]byte, 1024*8)
 	//var done uint32 = 4096

@@ -1,3 +1,5 @@
+//go:build windows
+
 package command
 
 import (
@@ -41,7 +43,7 @@ var privileges = []string{"SeAssignPrimaryTokenPrivilege",
 	"SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
 	"SeUndockPrivilege", "SeUnsolicitedInputPrivilege"}
 
-// always close, no matter it is invalid or not
+// always close handle, no matter it is invalid or not
 func closeToken(token windows.Token) error {
 	if isTokenValid {
 		err := windows.CloseHandle(windows.Handle(token))
@@ -53,7 +55,7 @@ func closeToken(token windows.Token) error {
 	return nil
 }
 
-// TODO when call createProcessWithLogonW will generate a strange error
+// TODO calling createProcessWithLogonW will generate a strange error
 func RunAs(b []byte) error {
 	domain, username, password, cmd, err := parseRunAs(b)
 	if err != nil {
@@ -93,8 +95,8 @@ func RunAs(b []byte) error {
 	defer windows.CloseHandle(procInfo.Process)
 	defer windows.CloseHandle(procInfo.Thread)
 
-	_, _ = windows.WaitForSingleObject(procInfo.Process, windows.INFINITE)
-	_, _ = windows.WaitForSingleObject(procInfo.Thread, windows.INFINITE)
+	_, _ = windows.WaitForSingleObject(procInfo.Process, 10*1000)
+	_, _ = windows.WaitForSingleObject(procInfo.Thread, 10*1000)
 
 	buf := make([]byte, 1024*8)
 	//var done uint32 = 4096

