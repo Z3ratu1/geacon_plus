@@ -20,7 +20,7 @@ func ListProcess(pendingRequest []byte) error {
 		name, _ := p.Name()
 		owner, _ := p.Username()
 		sessionId := sysinfo.GetProcessSessionId(pid)
-		arch := sysinfo.GetProcessArch(pid)
+		arch := sysinfo.GetProcessArch(uint32(pid))
 		var archString string
 		if arch == sysinfo.ProcessArch64 {
 			archString = "x64"

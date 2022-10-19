@@ -105,7 +105,7 @@ func IsOSX64() bool {
 	}
 }
 
-func GetProcessArch(pid int32) int {
+func GetProcessArch(pid uint32) int {
 	arch := ProcessArchUnknown
 	// https://learn.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-iswow64process
 	switch systemInfo.ProcessorArchitecture {
@@ -114,7 +114,8 @@ func GetProcessArch(pid int32) int {
 		fallthrough
 	case ProcessorArchitectureAMD64:
 		// 0x00100000 PROCESS_QUERY_LIMITED_INFORMATION,this privilege should be permitted in the most situation
-		handler, _ := windows.OpenProcess(uint32(0x1000), false, uint32(pid))
+		handler, _ := windows.OpenProcess(uint32(0x1000), false, pid)
+		defer windows.CloseHandle(handler)
 		var isWow64 bool
 		_ = windows.IsWow64Process(handler, &isWow64)
 		if isWow64 {
@@ -148,6 +149,7 @@ func IsProcessX64() bool {
 		// 0x00100000 PROCESS_QUERY_LIMITED_INFORMATION,this privilege should be permitted in the most situation
 		var isWow64 bool
 		hProcess, err := windows.GetCurrentProcess()
+		defer windows.CloseHandle(hProcess)
 		if err != nil {
 			panic(err)
 		}
