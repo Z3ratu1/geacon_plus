@@ -32,4 +32,8 @@ var (
 	HmacKey            []byte
 	Counter            = 0
 	ComputerNameLength = 0
+
+	// change remote dll inject to inject self
+	// but execute asm will not get echo
+	InjectSelf = true
 )

