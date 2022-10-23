@@ -60,7 +60,6 @@ func Run(b []byte) error {
 	//}
 }
 
-// just don't use cmd.exe, exec may also call CreateProcess to implement?
 func Exec(b []byte) error {
 	err := execNative(b)
 	if err != nil {
@@ -157,7 +156,13 @@ func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *win
 	if !ignoreToken && isTokenValid {
 		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
-			return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))
+			if err != windows.ERROR_PRIVILEGE_NOT_HELD {
+				return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))
+			}
+			err = windows.CreateProcessAsUser(stolenToken, appName, commandLine, nil, nil, false, 0, nil, nil, startupInfo, outProcInfo)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		err := windows.CreateProcess(appName, commandLine, procSecurity, threadSecurity, inheritHandles, creationFlags, env, currentDir, startupInfo, outProcInfo)

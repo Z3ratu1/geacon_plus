@@ -49,8 +49,8 @@ func WebDelivery(b []byte) {
 }
 
 func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
-	return execAsmInject(b, isDllX64, ignoreToken)
-	//return execAsmGo(b)
+	//return execAsmInject(b, isDllX64, ignoreToken)
+	return execAsmGo(b)
 }
 
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {

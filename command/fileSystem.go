@@ -169,7 +169,7 @@ func Download(b []byte) error {
 	}
 	var fileContent []byte
 	// 512kb
-	fileBuf := make([]byte, 512*1024)
+	fileBuf := make([]byte, 128*1024)
 	for {
 		n, err := fileHandle.Read(fileBuf)
 		if err != nil && err != io.EOF {

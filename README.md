@@ -11,7 +11,7 @@ golang实现的CobaltStrike beacon,在geacon基础上进行了较多扩展
 
 ## 实现功能
 支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
-已通过本地windows10与ubuntu22.04的测试,**暂只支持CobaltStrike4.0**，对高版本的支持可以通过修改metadata部分内容实现(大概)
+已通过本地windows7/10,winserver 2012与ubuntu22.04的测试,**暂只支持CobaltStrike4.0**，对高版本的支持可以通过修改metadata部分内容实现(大概)
 
 ### c2profile
 实现了对c2profile的部分支持 
@@ -30,13 +30,13 @@ golang实现的CobaltStrike beacon,在geacon基础上进行了较多扩展
 ### 进程注入
 仅支持windows平台
 支持dll注入，实现有单纯进程注入与拉起傀儡进程注入，支持screenshot,portscan,netview等CobaltStrike RDI任务
-实现execute-assembly指令内存注入或go语言实现内存执行C#
+实现execute-assembly指令内存注入或go语言实现内存执行C#  
 由于注入远程线程有一定几率被抓，添加了一个patch dll的exitProcess为exitThread后注入自身的操作，可以在config中选开
 
 ### token相关
 尝试实现了runas、make token，steal token等功能
 steal token能用，runas处报迷之错误，不清楚什么情况，
-make token很怪，用LOGON32_PROVIDER_DEFAULT输什么都密码错误，用LOGON32_LOGON_NEW_CREDENTIALS输啥都对拿回来的token用不了
+make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_LOGON_NEW_CREDENTIALS输啥都对拿回来的token用不了
 
 ## 完善
 由于调试服务端时总是报错行号对不上，代码的绝大多数是通过静态分析以及搜索资料等形式实现的，并不能保证对CS协议的完整还原  
@@ -51,5 +51,5 @@ make token很怪，用LOGON32_PROVIDER_DEFAULT输什么都密码错误，用LOGO
 ## reference
 本项目开发过程中参考了如下优秀项目  
 [mai1zhi2/SharpBeacon](https://github.com/mai1zhi2/SharpBeacon)  
-[darkr4y/geacon](https://github.com/darkr4y/geacon)
+[darkr4y/geacon](https://github.com/darkr4y/geacon)  
 [WBGlIl/ReBeacon_Src](https://github.com/WBGlIl/ReBeacon_Src)

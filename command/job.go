@@ -26,7 +26,6 @@ var (
 	virtualProtectEx        = kernel32.NewProc("VirtualProtectEx")
 	createRemoteThreadEx    = kernel32.NewProc("CreateRemoteThreadEx")
 	queueUserAPC            = kernel32.NewProc("QueueUserAPC")
-	terminateThread         = kernel32.NewProc("TerminateThread ")
 	rtlCopyMemory           = ntdll.NewProc("RtlCopyMemory")
 	createThread            = kernel32.NewProc("CreateThread")
 	createProcessWithLogonW = advapi32.NewProc("CreateProcessWithLogonW")
