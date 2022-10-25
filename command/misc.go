@@ -114,7 +114,6 @@ func parseAnArg(buf *bytes.Buffer) ([]byte, error) {
 	} else {
 		return nil, nil
 	}
-
 }
 
 func parseGetPrivs(b []byte) ([]string, error) {

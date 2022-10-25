@@ -1,9 +1,9 @@
 # geacon_plus
-golang实现的CobaltStrike beacon,在geacon基础上进行了较多扩展
+golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进行了较多扩展
 
-**该项目仅用于对CobaltStrike协议的学习测试，请勿使用于任何非法用途，由此产生的后果自行承担**
+**该项目仅用于对CobaltStrike协议的学习测试。请勿使用于任何非法用途，由此产生的后果自行承担**
 
-请不要将该项目上传vt等平台以延长其存活时间
+感谢好兄弟[@H4de5](https://github.com/H4de5-7)提供的windows部分代码支持
 
 ## 使用方法
 本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
@@ -29,14 +29,16 @@ golang实现的CobaltStrike beacon,在geacon基础上进行了较多扩展
 
 ### 进程注入
 仅支持windows平台
-支持dll注入，实现有单纯进程注入与拉起傀儡进程注入，支持screenshot,portscan,netview等CobaltStrike RDI任务
-实现execute-assembly指令内存注入或go语言实现内存执行C#  
-由于注入远程线程有一定几率被抓，添加了一个patch dll的exitProcess为exitThread后注入自身的操作，可以在config中选开
+支持反射dll注入，实现有单纯进程注入与拉起傀儡进程注入，支持screenshot,portscan,netview等CobaltStrike RDI任务
+由于注入远程线程有一定几率被抓，添加了一个patch dll的exitProcess为exitThread后将spawn+inject的改为注入自身的操作，可以在config中选开
 
 ### token相关
 尝试实现了runas、make token，steal token等功能
 steal token能用，runas处报迷之错误，不清楚什么情况，
 make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_LOGON_NEW_CREDENTIALS输啥都对拿回来的token用不了
+
+### 后渗透功能
+支持内存加载PowerShell module，支持使用反射DLL注入或go语言内存执行C#
 
 ## 完善
 由于调试服务端时总是报错行号对不上，代码的绝大多数是通过静态分析以及搜索资料等形式实现的，并不能保证对CS协议的完整还原  
