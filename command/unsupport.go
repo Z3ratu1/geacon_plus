@@ -9,15 +9,11 @@ import (
 
 // put unsupported func in linux and darwin here
 
-func InjectDll(b []byte) error {
+func InjectDll(b []byte, isDllX64 bool) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
 
-func SpawnAndInjectDllX64(dll []byte) error {
-	return errors.New("unsupported for " + runtime.GOOS)
-}
-
-func SpawnAndInjectDllX86(dll []byte) error {
+func SpawnAndInjectDll(dll []byte, isDllX64 bool, ignoreToken bool) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
 
@@ -53,7 +49,7 @@ func MakeToken(b []byte) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
 
-func ExecAsm(b []byte) error {
+func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
 

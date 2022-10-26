@@ -43,7 +43,7 @@ func IsProcessX64() bool {
 }
 
 // simply assume 64bit mac only run 64bit app
-func GetProcessArch(pid int32) int {
+func GetProcessArch(pid uint32) int {
 	if IsOSX64() {
 		return ProcessArch64
 	} else {
