@@ -66,7 +66,7 @@ func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 	} else {
 		procInfo := &windows.ProcessInformation{}
 		startupInfo := &windows.StartupInfo{
-			Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
+			Flags:      windows.STARTF_USESTDHANDLES,
 			ShowWindow: 1,
 		}
 		var readPipe, writePipe windows.Handle

@@ -7,7 +7,7 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 
 ## 使用方法
 本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
-编译时可添加-ldflags "-s -w"减小程序体积，同样可以使用[go-strip](https://github.com/boy-hack/go-strip)项目删除符号表等数据
+编译时可添加-ldflags "-H windowsgui -s -w"减小程序体积并取消黑框，同样可以使用[go-strip](https://github.com/boy-hack/go-strip)项目删除符号表等数据
 
 ## 实现功能
 支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  

