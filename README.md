@@ -4,6 +4,11 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 **该项目仅用于对CobaltStrike协议的学习测试。请勿使用于任何非法用途，由此产生的后果自行承担**
 
 感谢好兄弟[@H4de5](https://github.com/H4de5-7)提供的windows部分代码支持
+二次开发思路[CobaltStrike beacon二开指南](https://blog.z3ratu1.cn/CobaltStrike%20beacon%E4%BA%8C%E5%BC%80%E6%8C%87%E5%8D%97.html)
+
+## 实现功能
+支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
+已通过本地windows7/10,winserver 2012与ubuntu22.04的测试,**暂只支持CobaltStrike4.0**，对高版本的支持可以通过修改metadata部分内容实现(大概)
 
 ## 4.1+支持
 姊妹项目[geacon_pro](https://github.com/H4de5-7/geacon_pro)已上线，支持4.1+高版本，由于我们俩代码风格有点出入，封装上有点区别就没有直接合并，而是作为新项目  
@@ -13,9 +18,6 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
 编译时可添加-ldflags "-H windowsgui -s -w"减小程序体积并取消黑框，同样可以使用[go-strip](https://github.com/boy-hack/go-strip)项目删除符号表等数据
 
-## 实现功能
-支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
-已通过本地windows7/10,winserver 2012与ubuntu22.04的测试,**暂只支持CobaltStrike4.0**，对高版本的支持可以通过修改metadata部分内容实现(大概)
 
 ### c2profile
 实现了对c2profile的部分支持 
