@@ -3,14 +3,16 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 
 **该项目仅用于对CobaltStrike协议的学习测试。请勿使用于任何非法用途，由此产生的后果自行承担**
 
-感谢好兄弟[@H4de5](https://github.com/H4de5-7)提供的windows部分代码支持
+感谢好兄弟[@H4de5](https://github.com/H4de5-7)提供的windows部分代码支持  
 二次开发思路[CobaltStrike beacon二开指南](https://blog.z3ratu1.cn/CobaltStrike%20beacon%E4%BA%8C%E5%BC%80%E6%8C%87%E5%8D%97.html)
 
 ## 实现功能
 支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
-已通过本地windows7/10,winserver 2012与ubuntu22.04的测试,**暂只支持CobaltStrike4.0**，对高版本的支持可以通过修改metadata部分内容实现(大概)
+已通过本地windows7/10,winserver 2012与ubuntu22.04的测试  
 
-## 4.1+支持
+好像大家更喜欢高版本。。。所以进行了4.1+兼容的版本，可以在config.go中使用Support41Plus指定使用4.0版本还是4.1版本
+
+## 项目推荐
 姊妹项目[geacon_pro](https://github.com/H4de5-7/geacon_pro)已上线，支持4.1+高版本，由于我们俩代码风格有点出入，封装上有点区别就没有直接合并，而是作为新项目  
 具体功能都差不多，免杀等环节也基本一致。免杀和绕过等实现懒得写README了，具体实现等细节可参考geacon_pro项目README
 

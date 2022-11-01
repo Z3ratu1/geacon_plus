@@ -318,6 +318,8 @@ func HandlerJobAsync(b []byte) error {
 	callbackType := packet.ReadShort(buf)
 	sleepTime := packet.ReadShort(buf)
 	pipeName, _ := parseAnArg(buf)
+	// when in 4.1+, pipeName will always be 57 bytes length padding with 0, I need to remove it manually
+	pipeName = bytes.TrimRight(pipeName, "\x00")
 	commandType, _ := parseAnArg(buf)
 	if currentPid == 0 {
 		return nil
@@ -341,9 +343,9 @@ func HandlerJobAsync(b []byte) error {
 			removeJob(j.jid)
 			return
 		}
-
-		switch string(commandType) {
-		case "take screenshot":
+		// job name in 4.0 and 4.1+ is also different, so use callback type is more wisely
+		switch callbackType {
+		case CALLBACK_SCREENSHOT:
 			// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
 			result = result[4:]
 		default:

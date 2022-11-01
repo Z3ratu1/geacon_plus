@@ -35,7 +35,9 @@ var (
 
 	// change remote dll inject to inject self
 	// but execute asm will not get echo
-	InjectSelf = true
+	InjectSelf = false
+
+	Support41Plus = true
 	// proxy config
 	ProxyUrl = ""
 )

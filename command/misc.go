@@ -100,6 +100,7 @@ const (
 	CMD_TYPE_SPAWN_TOKEN_X86           = 89
 	CMD_TYPE_SPAWN_TOKEN_X64           = 90
 	CMD_TYPE_GET_SYSTEM                = 95
+	CMD_TYPE_UNKNOWN_JOB               = 101 // same as 40 job?
 )
 
 func parseAnArg(buf *bytes.Buffer) ([]byte, error) {

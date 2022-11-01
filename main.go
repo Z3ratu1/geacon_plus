@@ -94,6 +94,9 @@ func main() {
 								execErr = command.ExecAsm(cmdBuf, true, false)
 							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64:
 								execErr = command.ExecAsm(cmdBuf, true, true)
+							case command.CMD_TYPE_UNKNOWN_JOB:
+								// seems same as 40, to be done
+								fallthrough
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJobAsync(cmdBuf)
 							case command.CMD_TYPE_LIST_JOBS:

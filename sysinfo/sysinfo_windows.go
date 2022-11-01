@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"golang.org/x/sys/windows"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -60,11 +61,19 @@ func init() {
 func GetOSVersion() string {
 	version, err := syscall.GetVersion()
 	if err != nil {
-		panic(err)
+		fmt.Println("Error: " + err.Error())
+		return ""
 	}
-	//fmt.Printf("%d.%d (%d)\n", byte(version), uint8(version>>8), version>>16)
-
 	return fmt.Sprintf("%d.%d", byte(version), uint8(version>>8))
+}
+
+func GetOSVersion41Plus() string {
+	version, err := syscall.GetVersion()
+	if err != nil {
+		fmt.Println("Error: " + err.Error())
+		return ""
+	}
+	return fmt.Sprintf("%d.%d.%d\n", byte(version), uint8(version>>8), version>>16)
 }
 
 func IsHighPriv() bool {
@@ -168,18 +177,23 @@ func IsProcessX64() bool {
 func GetUsername() string {
 	username := make([]uint16, 128)
 	usernameLen := uint32(len(username)) - 1
-	err := syscall.GetUserNameEx(syscall.NameSamCompatible, &username[0], &usernameLen)
+	err := windows.GetUserNameEx(windows.NameSamCompatible, &username[0], &usernameLen)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error: " + err.Error())
+		return ""
 	}
-	s := syscall.UTF16ToString(username)
-	return s
+	usernameStr := windows.UTF16ToString(username)
+	// seems username be like computerName\username, so we split it here
+	arr := strings.Split(usernameStr, "\\")
+	usernameStr = arr[len(arr)-1]
+	return usernameStr
 }
 
 func GetCodePageANSI() []byte {
 	fnGetACP := Kernel32.NewProc("GetACP")
 	if fnGetACP.Find() != nil {
-		panic("not found GetACP")
+		fmt.Println("GetACP not found")
+		return nil
 	}
 	acp, _, _ := fnGetACP.Call()
 	//fmt.Printf("%v\n",acp)
@@ -192,7 +206,8 @@ func GetCodePageANSI() []byte {
 func GetCodePageOEM() []byte {
 	fnGetOEMCP := Kernel32.NewProc("GetOEMCP")
 	if fnGetOEMCP.Find() != nil {
-		panic("not found GetOEMCP")
+		fmt.Println("GetOEMCP not found")
+		return nil
 	}
 	acp, _, _ := fnGetOEMCP.Call()
 	//fmt.Printf("%v\n",acp)
