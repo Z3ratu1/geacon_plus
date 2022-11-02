@@ -189,6 +189,9 @@ func GetUsername() string {
 	return usernameStr
 }
 
+// IMPORTANT!!! charset is very important in beacon and server's communication
+// because go handle string as utf8, so all use utf8 should be a better choice?
+// need to transfer encoding manually when get output from pipe
 func GetCodePageANSI() []byte {
 	fnGetACP := Kernel32.NewProc("GetACP")
 	if fnGetACP.Find() != nil {
@@ -196,10 +199,12 @@ func GetCodePageANSI() []byte {
 		return nil
 	}
 	acp, _, _ := fnGetACP.Call()
-	//fmt.Printf("%v\n",acp)
-	acpbytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
-	return acpbytes[:2]
+	fmt.Printf("ANSI CodePage %v\n", acp)
+	ANSICodePage = uint32(acp)
+	acpbytes := make([]byte, 2)
+	//binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
+	binary.LittleEndian.PutUint16(acpbytes, 65001)
+	return acpbytes
 
 }
 
@@ -210,8 +215,9 @@ func GetCodePageOEM() []byte {
 		return nil
 	}
 	acp, _, _ := fnGetOEMCP.Call()
-	//fmt.Printf("%v\n",acp)
+	fmt.Printf("OEM CodePage %v\n", acp)
 	acpbytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
+	//binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
+	binary.LittleEndian.PutUint32(acpbytes, 65001)
 	return acpbytes[:2]
 }

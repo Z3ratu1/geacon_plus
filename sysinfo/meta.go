@@ -17,6 +17,8 @@ const (
 	ProcessArchUnknown = 3
 )
 
+var ANSICodePage uint32
+
 func GeaconID() int {
 	randomInt := util.RandomInt(100000, 999998)
 	if randomInt%2 == 0 {

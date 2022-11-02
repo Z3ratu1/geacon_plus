@@ -39,7 +39,6 @@ func GetNetworkInformation(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	pendingRequest := make([]byte, 4)
 	_, _ = buf.Read(pendingRequest)
-	finPacket := packet.MakePacket(CALLBACK_PENDING, util.BytesCombine(pendingRequest, []byte(result)))
-	packet.PushResult(finPacket)
+	packet.PushResult(CALLBACK_PENDING, util.BytesCombine(pendingRequest, []byte(result)))
 	return nil
 }

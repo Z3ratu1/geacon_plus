@@ -26,8 +26,8 @@ func init() {
 	if config.ProxyUrl != "" {
 		err := httpRequest.SetProxyUrl(config.ProxyUrl)
 		if err != nil {
-			result := MakePacket(31, []byte(fmt.Sprintf("error proxy url: %s", config.ProxyUrl)))
-			PushResult(result)
+			// 31 CALLBACK_ERROR
+			PushResult(31, []byte(fmt.Sprintf("error proxy url: %s", config.ProxyUrl)))
 			os.Exit(1)
 		}
 	}

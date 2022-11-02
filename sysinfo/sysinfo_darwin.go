@@ -15,6 +15,12 @@ func GetOSVersion() string {
 	return string(out[:])
 }
 
+func GetOSVersion41Plus() string {
+	// no idea about darwin
+
+	return "0.0.0"
+}
+
 func IsHighPriv() bool {
 	fd, err := os.Open("/root")
 	defer fd.Close()
@@ -57,16 +63,17 @@ func GetProcessSessionId(pid int32) uint32 {
 }
 
 func GetCodePageANSI() []byte {
-	//hardcode for test
+	// darwin use default utf8? I guess
 	b := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b, 936)
+	ANSICodePage = 65001
+	binary.LittleEndian.PutUint16(b, 65001)
 	return b
 }
 
 func GetCodePageOEM() []byte {
-	//hardcode for test
+	//darwin use default utf8? I guess
 	b := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b, 936)
+	binary.LittleEndian.PutUint16(b, 65001)
 	return b
 }
 

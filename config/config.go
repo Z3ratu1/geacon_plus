@@ -37,7 +37,7 @@ var (
 	// but execute asm will not get echo
 	InjectSelf = false
 
-	Support41Plus = true
+	Support41Plus = false
 	// proxy config
 	ProxyUrl = ""
 )

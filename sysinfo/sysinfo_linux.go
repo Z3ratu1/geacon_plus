@@ -40,6 +40,16 @@ func GetOSVersion() string {
 	return "0.0"
 }
 
+func GetOSVersion41Plus() string {
+	// no idea about linux
+	//uname := getUname()
+
+	//if len(uname.Release) > 0 {
+	//	return arrayToString(uname.Release)
+	//}
+	return "0.0.0"
+}
+
 // just assume 64bit linux only run 64bit app
 func GetProcessArch(pid uint32) int {
 	if IsOSX64() {
@@ -78,17 +88,19 @@ func IsProcessX64() bool {
 	return true
 }
 
+// charset, refer https://xz.aliyun.com/t/11055
 func GetCodePageANSI() []byte {
-	//hardcode for test
+	// linux use default utf-8 codepage
 	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, 936)
+	ANSICodePage = 65001
+	binary.LittleEndian.PutUint16(b, 65001)
 	return b
 }
 
 func GetCodePageOEM() []byte {
-	//hardcode for test
+	// linux use default utf-8 codepage
 	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, 936)
+	binary.LittleEndian.PutUint16(b, 65001)
 	return b
 }
 

