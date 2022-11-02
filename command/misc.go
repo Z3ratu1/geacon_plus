@@ -9,50 +9,6 @@ import (
 	"time"
 )
 
-// all of this can be found in beacon.Job class
-const (
-	// IMPORTANT! windows default use codepage 936(GBK)
-	// if using CALLBACK 0, CS server will handle result use charset attr in metadata, which will not cause Chinese garbled
-	// BUT go deal character as utf8, so Chinese result generate by go will have an encoding problem
-	CALLBACK_OUTPUT            = 0
-	CALLBACK_KEYSTROKES        = 1
-	CALLBACK_FILE              = 2
-	CALLBACK_SCREENSHOT        = 3
-	CALLBACK_CLOSE             = 4
-	CALLBACK_READ              = 5
-	CALLBACK_CONNECT           = 6
-	CALLBACK_PING              = 7
-	CALLBACK_FILE_WRITE        = 8
-	CALLBACK_FILE_CLOSE        = 9
-	CALLBACK_PIPE_OPEN         = 10
-	CALLBACK_PIPE_CLOSE        = 11
-	CALLBACK_PIPE_READ         = 12
-	CALLBACK_POST_ERROR        = 13
-	CALLBACK_PIPE_PING         = 14
-	CALLBACK_TOKEN_STOLEN      = 15
-	CALLBACK_TOKEN_GETUID      = 16
-	CALLBACK_PROCESS_LIST      = 17
-	CALLBACK_POST_REPLAY_ERROR = 18
-	CALLBACK_PWD               = 19
-	CALLBACK_LIST_JOBS         = 20
-	CALLBACK_HASHDUMP          = 21
-	CALLBACK_PENDING           = 22
-	CALLBACK_ACCEPT            = 23
-	CALLBACK_NETVIEW           = 24
-	CALLBACK_PORTSCAN          = 25
-	CALLBACK_DEAD              = 26
-	CALLBACK_SSH_STATUS        = 27
-	CALLBACK_CHUNK_ALLOCATE    = 28
-	CALLBACK_CHUNK_SEND        = 29
-	CALLBACK_OUTPUT_OEM        = 30
-	CALLBACK_ERROR             = 31
-	CALLBACK_OUTPUT_UTF8       = 32
-)
-
-// reference https://github.com/mai1zhi2/SharpBeacon/blob/master/Beacon/Profiles/Config.cs
-// https://github.com/WBGlIl/ReBeacon_Src/blob/main/ReBeacon_Src/BeaconTask.cpp
-// https://sec-in.com/article/1554
-// part of them also can be found in cs jar,but I forget where I found them
 // most of the interaction can be found in beacon.Taskbeacon
 const (
 	CMD_TYPE_SPAWN_IGNORE_TOKEN_X86    = 1
