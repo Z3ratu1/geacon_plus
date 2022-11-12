@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"main/packet"
 	"main/util"
 	"net"
@@ -18,7 +17,7 @@ func GetNetworkInformation(b []byte) error {
 	for _, i := range interfaces {
 		addrs, err := i.Addrs()
 		if err != nil {
-			fmt.Print(fmt.Errorf("localAddresses: %+v\n", err.Error()))
+			util.Println(util.Sprintf("localAddresses: %+v\n", err.Error()))
 			continue
 		}
 		for _, a := range addrs {
@@ -29,8 +28,8 @@ func GetNetworkInformation(b []byte) error {
 					continue
 				}
 				if !strings.HasPrefix(v.IP.String(), "169.254") && !v.IP.IsLoopback() {
-					mask := fmt.Sprintf("%d.%d.%d.%d", v.Mask[0], v.Mask[1], v.Mask[2], v.Mask[3])
-					result += fmt.Sprintf("%s\t%s\t%d\t%s\n", v.IP, mask, i.MTU, i.HardwareAddr)
+					mask := util.Sprintf("%d.%d.%d.%d", v.Mask[0], v.Mask[1], v.Mask[2], v.Mask[3])
+					result += util.Sprintf("%s\t%s\t%d\t%s\n", v.IP, mask, i.MTU, i.HardwareAddr)
 				}
 			}
 

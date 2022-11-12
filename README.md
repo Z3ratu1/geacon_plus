@@ -55,8 +55,10 @@ make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_L
 ## TODO
 - ~~实现令牌窃取等功能~~
 - 实现内网级联端口转发代理等功能
-- 实现stager(从来不用，并没有这个打算)
-- 实现DNSbeacon(好像有人实现了，从来不用，并没有这个打算)
+- 实现timestomp和ppid两个功能
+- 实现run，upload download等命令的异步执行
+- 写一个更好的c2profile
+- **32位下可能存在不明bug**
 
 ## reference
 本项目开发过程中参考了如下优秀项目  

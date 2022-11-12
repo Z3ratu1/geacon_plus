@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -14,7 +15,8 @@ func GetPublicKey() (*rsa.PublicKey, error) {
 	if block == nil {
 		return nil, errors.New("public key error")
 	}
-	pubInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
+	// sometimes public key was padded with \x00
+	pubInterface, err := x509.ParsePKIXPublicKey(bytes.Trim(block.Bytes, "\x00"))
 	if err != nil {
 		return nil, err
 	}

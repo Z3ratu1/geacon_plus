@@ -9,7 +9,7 @@ var (
 	http  = "http://"
 	https = "https://"
 	// change to switch http(s)
-	Host = http + C2
+	Host = https + C2
 
 	// RsaPublicKey only used when first send meta info to server
 	RsaPublicKey = []byte(`-----BEGIN PUBLIC KEY-----
@@ -35,9 +35,10 @@ var (
 
 	// change remote dll inject to inject self
 	// but execute asm will not get echo
-	InjectSelf = false
-
+	InjectSelf    = false
+	DeleteSelf    = true
 	Support41Plus = false
+	Debug         = false
 	// proxy config
 	ProxyUrl = ""
 )

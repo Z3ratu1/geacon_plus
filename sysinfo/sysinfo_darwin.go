@@ -40,12 +40,11 @@ func IsOSX64() bool {
 	return false
 }
 
-// not sure why amd64 return false
 func IsProcessX64() bool {
-	if runtime.GOARCH == "amd64" {
-		return false
+	if runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" || runtime.GOARCH == "arm64be" {
+		return true
 	}
-	return true
+	return false
 }
 
 // simply assume 64bit mac only run 64bit app

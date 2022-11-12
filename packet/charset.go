@@ -23,9 +23,9 @@ import (
 //	54936: "gb18030",
 //	65001: "utf8",
 //}
-
-// use charset packet will significantly improve the size of our binary....
-// maybe use Windows api to do charset convert would be better, as Linux and macOS use utf8 default
+//
+//use charset packet will significantly improve the size of our binary....
+//maybe use Windows api to do charset convert would be better, as Linux and macOS use utf8 default
 //func codepageToUTF8(b []byte) ([]byte, error) {
 //	// if is not utf8
 //	if !utf8.Valid(b) {

