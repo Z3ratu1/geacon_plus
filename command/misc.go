@@ -109,16 +109,20 @@ func parseCommandCopy(b []byte) ([]byte, []byte, error) {
 	return parseCommandMove(b)
 }
 
-func parseCommandShell(b []byte) ([]byte, []byte, error) {
-	return parseCommandMove(b)
-}
-
 func parseMakeToken(b []byte) ([]byte, []byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	domain, err := parseAnArg(buf)
 	username, err := parseAnArg(buf)
 	password, err := parseAnArg(buf)
 	return domain, username, password, err
+}
+
+func parseCommandShell(b []byte) ([]byte, []byte, uint16, error) {
+	buf := bytes.NewBuffer(b)
+	path, err := parseAnArg(buf)
+	args, err := parseAnArg(buf)
+	redirect := packet.ReadShort(buf)
+	return path, args, redirect, err
 }
 
 func parseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {

