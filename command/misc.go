@@ -6,6 +6,7 @@ import (
 	"main/packet"
 	"main/util"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -178,4 +179,18 @@ func Pause(b []byte) {
 	pauseTime := packet.ReadInt(buf)
 	util.Println(util.Sprintf("Pause time: %d", pauseTime))
 	time.Sleep(time.Duration(pauseTime) * time.Millisecond)
+}
+
+func TimeCheck(current time.Time) {
+	if config.EndTime != "" {
+		endTime, err := time.ParseInLocation(config.TimeLayout, config.EndTime, time.Local)
+		if err != nil {
+			return
+		}
+		if current.After(endTime) {
+			util.Println("Time exceed, destroy self")
+			DeleteSelf()
+			os.Exit(0)
+		}
+	}
 }

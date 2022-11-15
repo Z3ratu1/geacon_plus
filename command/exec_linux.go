@@ -4,7 +4,9 @@ package command
 
 import (
 	"errors"
+	"main/config"
 	"main/packet"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -17,7 +19,7 @@ func DeleteSelf() {
 			return
 		}
 		cmd := exec.Command("/bin/sh", "-c", "rm -f "+string(selfName))
-		err := cmd.Start()
+		err = cmd.Start()
 	}
 }
 

