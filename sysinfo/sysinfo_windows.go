@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	Kernel32   = windows.NewLazyDLL("Kernel32.dll")
-	systemInfo = SystemInfo{}
+	Kernel32             = windows.NewLazyDLL("Kernel32.dll")
+	Advapi32             = windows.NewLazyDLL("Advapi32.dll")
+	checkTokenMembership = Advapi32.NewProc("CheckTokenMembership")
+	systemInfo           = SystemInfo{}
 )
 
 type SystemInfo struct {
@@ -77,23 +79,35 @@ func GetOSVersion41Plus() string {
 	return util.Sprintf("%d.%d.%d\n", byte(version), uint8(version>>8), version>>16)
 }
 
-// sometimes not right
+// use AllocateAndInitializeSid to judge
 func IsHighPriv() bool {
-	token := windows.GetCurrentProcessToken()
-	defer token.Close()
-	/*
-		ref:
-		C version https://vimalshekar.github.io/codesamples/Checking-If-Admin
-		Go package https://github.com/golang/sys/blob/master/windows/security_windows.go ---> IsElevated
-		maybe future will use ---> golang/x/sys/windows
-	*/
-	var isElevated uint32
-	var outLen uint32
-	err := windows.GetTokenInformation(token, windows.TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
+	//token := windows.GetCurrentProcessToken()
+	//defer token.Close()
+	///*
+	//	ref:
+	//	C version https://vimalshekar.github.io/codesamples/Checking-If-Admin
+	//	Go package https://github.com/golang/sys/blob/master/windows/security_windows.go ---> IsElevated
+	//	maybe future will use ---> golang/x/sys/windows
+	//*/
+	//var isElevated uint32
+	//var outLen uint32
+	//err := windows.GetTokenInformation(token, windows.TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
+	//if err != nil {
+	//	return false
+	//}
+	//return outLen == uint32(unsafe.Sizeof(isElevated)) && isElevated != 0
+	sid := &windows.SID{}
+	err := windows.AllocateAndInitializeSid(&windows.SECURITY_NT_AUTHORITY, 2, windows.SECURITY_BUILTIN_DOMAIN_RID, windows.DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &sid)
 	if err != nil {
 		return false
 	}
-	return outLen == uint32(unsafe.Sizeof(isElevated)) && isElevated != 0
+	defer windows.FreeSid(sid)
+	t := true
+	_, _, err = checkTokenMembership.Call(0, uintptr(unsafe.Pointer(sid)), uintptr(unsafe.Pointer(&t)))
+	if err != nil && err != windows.NTE_OP_OK {
+		return false
+	}
+	return t
 }
 
 func IsOSX64() bool {
