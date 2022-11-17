@@ -110,6 +110,10 @@ func parseCommandCopy(b []byte) ([]byte, []byte, error) {
 	return parseCommandMove(b)
 }
 
+func parseTimeStomp(b []byte) ([]byte, []byte, error) {
+	return parseCommandMove(b)
+}
+
 func parseMakeToken(b []byte) ([]byte, []byte, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	domain, err := parseAnArg(buf)

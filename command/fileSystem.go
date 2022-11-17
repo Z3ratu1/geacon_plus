@@ -261,3 +261,7 @@ func ListDrives(b []byte) error {
 	// only works in windows, put implement in exec_windows.go now
 	return listDrivesInner(b)
 }
+
+func TimeStomp(b []byte) error {
+	return TimeStompInner(b)
+}

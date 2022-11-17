@@ -63,3 +63,6 @@ func WebDelivery(b []byte) {
 func listDrivesInner(b []byte) error {
 	return errors.New("unsupported for " + runtime.GOOS)
 }
+func TimeStompInner(b []byte) error {
+	return errors.New("unsupported for " + runtime.GOOS)
+}

@@ -55,7 +55,7 @@ make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_L
 ## TODO
 - ~~实现令牌窃取等功能~~
 - 实现内网级联端口转发代理等功能
-- 实现timestomp和ppid两个功能
+- 实现~~timestomp和~~ppid功能
 - ~~实现run，upload download等命令的异步执行~~linux和darwin的还没写
 - 写一个更好的c2profile
 - **32位下可能存在不明bug**
