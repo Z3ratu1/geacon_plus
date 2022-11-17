@@ -117,6 +117,8 @@ func main() {
 								execErr = command.ListProcess(cmdBuf)
 							case command.CMD_TYPE_KILL:
 								execErr = command.KillProcess(cmdBuf)
+							case command.CMD_TYPE_DRIVES:
+								execErr = command.ListDrives(cmdBuf)
 							case command.CMD_TYPE_REMOVE:
 								execErr = command.Remove(string(cmdBuf))
 							case command.CMD_TYPE_FILE_COPY:

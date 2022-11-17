@@ -59,3 +59,7 @@ func PowershellImport(b []byte) {
 func WebDelivery(b []byte) {
 
 }
+
+func listDrivesInner(b []byte) error {
+	return errors.New("unsupported for " + runtime.GOOS)
+}

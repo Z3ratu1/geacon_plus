@@ -256,3 +256,8 @@ func MakeDir(dir string) error {
 	}
 	return nil
 }
+
+func ListDrives(b []byte) error {
+	// only works in windows, put implement in exec_windows.go now
+	return listDrivesInner(b)
+}

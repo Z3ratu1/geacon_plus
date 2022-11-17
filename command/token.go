@@ -60,7 +60,7 @@ func closeToken(token windows.Token) error {
 func getPrivs(privs []string) (string, error) {
 	result := ""
 	var token windows.Token
-	// try to get privileges from stolen token
+	// if stolenToken exists, get privileges for stolenToken
 	if isTokenValid {
 		token = stolenToken
 	} else {

