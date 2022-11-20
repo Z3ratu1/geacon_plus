@@ -18,6 +18,7 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 
 ## 使用方法
 本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
+c2profile支持部分编码和填充，项目中的c2profile来自于经典jquery.profile，此处一并给出
 编译时可添加-ldflags "-H windowsgui -s -w"减小程序体积并取消黑框，同样可以使用[go-strip](https://github.com/boy-hack/go-strip)项目删除符号表等数据
 
 
@@ -53,12 +54,7 @@ make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_L
 同时，作者的windows水平低下，因此对令牌窃取，hash传递方面一窍不通，对内网级联等操作也未认真分析(搞不动了)，欢迎各路神仙交流讨论以及提交PR
 
 ## TODO
-- ~~实现令牌窃取等功能~~
-- 实现内网级联端口转发代理等功能
-- 实现~~timestomp和~~ppid功能
-- ~~实现run，upload download等命令的异步执行~~linux和darwin的还没写
-- 写一个更好的c2profile
-- **32位下可能存在不明bug**
+转到issue里了
 
 ## reference
 本项目开发过程中参考了如下优秀项目  

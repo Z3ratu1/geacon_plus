@@ -168,6 +168,7 @@ func EncryptedMetaInfo() []byte {
 		tempPacket = MakeMetaInfo()
 		config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
 		packetUnencrypted = MakeMetaInfo()
+		util.Println(packetUnencrypted)
 	}
 	packetEncrypted, err = util.RsaEncrypt(packetUnencrypted, publicKey)
 	if err != nil {

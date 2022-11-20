@@ -154,7 +154,7 @@ func main() {
 								command.DeleteSelf()
 								os.Exit(0)
 							default:
-								errMsg := util.Sprintf("command type %d is not support by geacon now\n", cmdType)
+								errMsg := util.Sprintf("command type %d is not support by geacon now", cmdType)
 								packet.ErrorMessage(errMsg)
 							}
 							if execErr != nil {
