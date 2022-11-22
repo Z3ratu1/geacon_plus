@@ -15,7 +15,10 @@ func ListProcess(pendingRequest []byte) error {
 	result := ""
 	for _, p := range processes {
 		pid := p.Pid
-		parent, _ := p.Parent()
+		parent, err := p.Parent()
+		if err != nil {
+			continue
+		}
 		pPid := parent.Pid
 		name, _ := p.Name()
 		owner, _ := p.Username()

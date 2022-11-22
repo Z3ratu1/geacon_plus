@@ -85,17 +85,22 @@ func InjectDll(b []byte, isDllX64 bool) error {
 
 		// callUserAPC deploy
 		threadIds := listThread(pid)
-		threadHandle, err := windows.OpenThread(0, false, threadIds[0])
-		if err != nil {
-			return err
+		// traverse all thread
+		for _, threadId := range threadIds {
+			var threadHandle windows.Handle
+			threadHandle, err = windows.OpenThread(0, false, threadId)
+			if err != nil {
+				continue
+			}
+			err = callUserAPC(processHandle, threadHandle, dll, offset)
+			if err != nil {
+				_ = windows.CloseHandle(threadHandle)
+				continue
+			}
+			currentPid = pid
+			currentHandle = threadHandle
 		}
-		err = callUserAPC(processHandle, threadHandle, dll, offset)
-		if err != nil {
-			_ = windows.CloseHandle(threadHandle)
-			return err
-		}
-		currentPid = pid
-		currentHandle = threadHandle
+		return err
 	}
 	return nil
 }
@@ -248,7 +253,7 @@ func listThread(pid uint32) []uint32 {
 	for err != windows.ERROR_NO_MORE_FILES {
 		if te.OwnerProcessID == pid {
 			threadId = append(threadId, te.ThreadID)
-			util.Println(te.ThreadID)
+			//util.Println(te.ThreadID)
 		}
 		err = windows.Thread32Next(snapshot, &te)
 	}

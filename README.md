@@ -17,8 +17,8 @@ golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进
 具体功能都差不多，免杀等环节也基本一致。免杀和绕过等实现懒得写README了，具体实现等细节可参考geacon_pro项目README
 
 ## 使用方法
-本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目
-c2profile支持部分编码和填充，项目中的c2profile来自于经典jquery.profile，此处一并给出
+本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目  
+c2profile支持部分编码和填充，项目中的c2profile来自于经典jquery.profile，此处一并给出  
 编译时可添加-ldflags "-H windowsgui -s -w"减小程序体积并取消黑框，同样可以使用[go-strip](https://github.com/boy-hack/go-strip)项目删除符号表等数据
 
 
