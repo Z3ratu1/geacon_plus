@@ -139,19 +139,18 @@ https-certificate {
 ##    - The amsi_disable option directs powerpick, execute-assembly, and psinject to patch the AmsiScanBuffer function before loading .NET or PowerShell code. This limits the Antimalware Scan Interface visibility into these capabilities.
 ##    - The smartinject option directs Beacon to embed key function pointers, like GetProcAddress and LoadLibrary, into its same-architecture post-ex DLLs. This allows post-ex DLLs to bootstrap themselves in a new process without shellcode-like behavior that is detected and mitigated by watching memory accesses to the PEB and kernel32.dll
 
-#post-ex {
+# post-ex {
     # Optionally specify non-existent filepath to force manual specification based on the Beacon host's running processes
-    # set spawnto_x86 "%windir%\\syswow64\\dllhost.exe";
+    #set spawnto_x86 "%windir%\\syswow64\\dllhost.exe";
     # Hardcode paths like C:\\Windows\\System32\\dllhost.exe to avoid potential detections for %SYSNATIVE% use. !! This will break when attempting to spawn a 64bit post-ex job from a 32bit Beacon.
-    # set spawnto_x64 "%windir%\\sysnative\\dllhost.exe";
-
+    #set spawnto_x64 "%windir%\\sysnative\\dllhost.exe";
     # change the permissions and content of our post-ex DLLs
-    # set obfuscate "true";
+    #set obfuscate "true";
     # pass key function pointers from Beacon to its child jobs
-    # set smartinject "true";
+    #set smartinject "true";
     # disable AMSI in powerpick, execute-assembly, and psinject
     # set amsi_disable "true";
-#}
+# }
 
 ################################################
 ## TCP Beacon

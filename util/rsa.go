@@ -10,7 +10,7 @@ import (
 	"main/config"
 )
 
-func GetPublicKey() (*rsa.PublicKey, error) {
+func RsaEncrypt(origData []byte) ([]byte, error) {
 	block, _ := pem.Decode(config.RsaPublicKey)
 	if block == nil {
 		return nil, errors.New("public key error")
@@ -21,10 +21,10 @@ func GetPublicKey() (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	pub := pubInterface.(*rsa.PublicKey)
-	return pub, nil
+	return rsa.EncryptPKCS1v15(rand.Reader, pub, origData)
 }
 
-func GetPrivateKey() (*rsa.PrivateKey, error) {
+func RsaDecrypt(origData []byte) ([]byte, error) {
 	block, _ := pem.Decode(config.RsaPrivateKey)
 	if block == nil {
 		return nil, errors.New("private key error")
@@ -34,13 +34,5 @@ func GetPrivateKey() (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	priv := privInterface.(*rsa.PrivateKey)
-	return priv, nil
-}
-
-func RsaEncrypt(origData []byte, pub *rsa.PublicKey) ([]byte, error) {
-	return rsa.EncryptPKCS1v15(rand.Reader, pub, origData)
-}
-
-func RsaDecrypt(origData []byte, priv *rsa.PrivateKey) ([]byte, error) {
 	return rsa.DecryptPKCS1v15(rand.Reader, priv, origData)
 }

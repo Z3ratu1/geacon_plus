@@ -2,7 +2,6 @@ package sysinfo
 
 import (
 	"encoding/binary"
-	"main/config"
 	"main/util"
 	"net"
 	"os"
@@ -44,10 +43,6 @@ func GetProcessName() string {
 	if backslashPos > 0 {
 		result = processName[backslashPos+1:]
 	}
-	// stupid length limit
-	if len(result) > 10 {
-		result = result[len(result)-9:]
-	}
 	return result
 }
 
@@ -62,12 +57,9 @@ func GetComputerName() string {
 	// message too long for RSA public key size
 
 	if runtime.GOOS == "linux" {
-		sHostName = sHostName + " (Linux)"
+		sHostName = sHostName + "(Linux)"
 	} else if runtime.GOOS == "darwin" {
-		sHostName = sHostName + " (Darwin)"
-	}
-	if len(sHostName) > config.ComputerNameLength {
-		return sHostName[:config.ComputerNameLength]
+		sHostName = sHostName + "(Darwin)"
 	}
 	return sHostName
 }

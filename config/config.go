@@ -29,13 +29,12 @@ var (
 	// AesKey  first 16 bytes of GlobalKey hash, used for latter communication
 	AesKey []byte
 	// HmacKey latter 16 bytes of GlobalKey hash
-	HmacKey            []byte
-	Counter            = 0
-	ComputerNameLength = 0
+	HmacKey []byte
+	Counter = 0
 
 	/* custom options here  */
 	// change remote dll inject to inject self, but execute asm will not get echo
-	InjectSelf    = true
+	InjectSelf    = false
 	DeleteSelf    = true
 	Support41Plus = false
 	// if debug is false there will be no output

