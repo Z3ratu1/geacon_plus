@@ -21,17 +21,6 @@ var (
 	VerifySSLCert               = true
 	TimeOut       time.Duration = 30 //seconds
 
-	// **YOU SHOULD NEVER CHANGE IT!!!!!**
-	IV = []byte("abcdefghijklmnop")
-	// GlobalKey 16 bytes global key, generate randomly at each execute, send to server when in meta info.
-	// can be changed at each package
-	GlobalKey []byte
-	// AesKey  first 16 bytes of GlobalKey hash, used for latter communication
-	AesKey []byte
-	// HmacKey latter 16 bytes of GlobalKey hash
-	HmacKey []byte
-	Counter = 0
-
 	/* custom options here  */
 	// change remote dll inject to inject self, but execute asm will not get echo
 	InjectSelf    = false
