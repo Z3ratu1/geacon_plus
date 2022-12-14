@@ -164,6 +164,8 @@ func main() {
 					}
 				}
 			}
+			// after cmd finish
+			//command.CheckDownload()
 			command.Sleep()
 		}
 	}

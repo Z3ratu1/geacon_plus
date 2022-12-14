@@ -60,7 +60,7 @@ func HttpPost(data []byte) *req.Resp {
 		resp, err := httpRequest.Post(url, data, headers, param)
 		if err != nil {
 			util.Printf("!error: %v\n", err)
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * time.Duration(config.WaitTime))
 			continue
 		} else {
 			if resp.Response().StatusCode == http.StatusOK {

