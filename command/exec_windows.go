@@ -99,7 +99,7 @@ func Run(b []byte) error {
 	go func() {
 		err := runNative(string(path), string(args))
 		if err != nil {
-			packet.PushResult(packet.CALLBACK_ERROR, []byte(err.Error()))
+			packet.ErrorMessage(err.Error())
 		}
 	}()
 	return err
