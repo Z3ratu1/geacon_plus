@@ -56,10 +56,12 @@ func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
 	_, _, _, description, _, _, _ := parseExecAsm(b)
 	if string(description) != ".NET assembly" {
-		return execAsmInject(b, isDllX64, ignoreToken)
+		//return execAsmInject(b, isDllX64, ignoreToken)
+		return execAsmGo(b)
+
 	}
-	return execAsmInject(b, isDllX64, ignoreToken)
-	//return execAsmGo(b)
+	//return execAsmInject(b, isDllX64, ignoreToken)
+	return execAsmGo(b)
 }
 
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {

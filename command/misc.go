@@ -198,3 +198,7 @@ func TimeCheck(current time.Time) {
 		}
 	}
 }
+
+func DeleteSelf() {
+	DeleteSelfImpl()
+}

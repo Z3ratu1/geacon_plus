@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"math/rand"
 )
 
@@ -95,9 +96,13 @@ func DecryptField(decryptTypes []string, data []byte) ([]byte, error) {
 			}
 		case "mask":
 			// use first 4 bytes XOR payload
-			key := data[0:4]
-			data = data[4:]
-			data = XOR(data, key)
+			if len(data) > 4 {
+				key := data[0:4]
+				data = data[4:]
+				data = XOR(data, key)
+			} else {
+				return nil, errors.New("invalid mask length")
+			}
 		case "netbios":
 			data = NetbiosDecode(originData, 'a')
 		case "netbiosu":
