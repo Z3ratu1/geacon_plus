@@ -203,7 +203,7 @@ func runNative(path string, args string) error {
 
 // this func read from pipe and send result back to server
 func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callbackType int, stopChan chan bool) error {
-	event, err := windows.WaitForSingleObject(handle, uint32(sleepTime))
+	event, err := windows.WaitForSingleObject(handle, 0)
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callb
 			}
 		}
 		// use WaitForSingleObject to check if process had exit
-		event, err = windows.WaitForSingleObject(handle, uint32(sleepTime)/10)
+		event, err = windows.WaitForSingleObject(handle, 0)
 		if err != nil {
 			return err
 		}
