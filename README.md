@@ -1,20 +1,22 @@
 # geacon_plus
 golang实现的CobaltStrike stageless http(s) beacon,在geacon项目基础上进行了较多扩展
 
-**该项目仅用于对CobaltStrike协议的学习测试。请勿使用于任何非法用途，由此产生的后果自行承担**
-
 感谢好兄弟[@H4de5](https://github.com/H4de5-7)提供的windows部分代码支持  
 二次开发思路[CobaltStrike beacon二开指南](https://blog.z3ratu1.cn/CobaltStrike%20beacon%E4%BA%8C%E5%BC%80%E6%8C%87%E5%8D%97.html)
+
+## 免责声明
+请在完全阅读并认同如下内容后使用本项目
+**该项目仅用于对CobaltStrike协议的学习以及相关技术手法实现的测试。
+请勿使用于任何非法用途，严禁使用该项目对计算机信息系统进行攻击。由此产生的后果由使用者自行承担**
+姊妹项目[geacon_pro](https://github.com/H4de5-7/geacon_pro)由于存在较高的攻击性，存在被滥用风险，已转为私有，不再对外开放
+本项目未同步更新pro版本中后期添加的免杀相关功能，仅作为学习CS beacon的设计使用
+
 
 ## 实现功能
 支持跨平台使用,可在linux及macOS上执行简单命令(没有macOS所以是理论上可以执行)  
 已通过本地windows7/10,winserver 2012与ubuntu22.04的测试  
 
 好像大家更喜欢高版本。。。所以进行了4.1+版本的兼容，可以在config/config.go中使用Support41Plus指定使用4.0版本还是4.1+版本
-
-## 项目推荐
-姊妹项目[geacon_pro](https://github.com/H4de5-7/geacon_pro)已上线，支持4.1+高版本，由于我们俩代码风格有点出入，封装上有点区别就没有直接合并，而是作为新项目  
-具体功能都差不多，免杀等环节也基本一致。免杀和绕过等实现懒得写README了，具体实现等细节可参考geacon_pro项目README
 
 ## 使用方法
 本项目基于[darkr4y/geacon](https://github.com/darkr4y/geacon)进行改进，具体使用方法可参考原项目  

