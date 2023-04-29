@@ -316,11 +316,6 @@ func createRemoteThread(processHandle windows.Handle, offset uint32, shellcode [
 		if errWriteProcessMemory != nil && errWriteProcessMemory != windows.SEVERITY_SUCCESS {
 			return 0, errors.New(util.Sprintf("[!]Error calling WriteProcessMemory: %s", errWriteProcessMemory))
 		}
-		oldProtect := windows.PAGE_READWRITE
-		_, _, errVirtualProtectEx := virtualProtectEx.Call(uintptr(processHandle), argsAddr, uintptr(len(args)), windows.PAGE_EXECUTE_READ, uintptr(unsafe.Pointer(&oldProtect)))
-		if errVirtualProtectEx != nil && errVirtualProtectEx != windows.SEVERITY_SUCCESS {
-			return 0, errors.New(util.Sprintf("Error calling VirtualProtectEx: %s", errVirtualProtectEx))
-		}
 	}
 
 	addr, _, errVirtualAlloc := virtualAllocEx.Call(uintptr(processHandle), 0, uintptr(len(shellcode)), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
