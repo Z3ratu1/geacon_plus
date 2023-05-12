@@ -79,7 +79,7 @@ but run would just send `cmd` as args, and with a path length 0
 %COMSPEC% point to cmd.exe usually, and we always read %COMSPEC% as app, follow as args
 we have extracted path and args before call Run, so only deploy how to run a process is ok
 */
-func Run(b []byte) error {
+func runImpl(b []byte) error {
 	// third params is Wow64DisableWow64FsRedirection, used for 32bit wow64 program to access native system32 folder,
 	// but I have changed the system32 dir manually, so it is ignored
 	path, args, _, err := parseCommandShell(b)

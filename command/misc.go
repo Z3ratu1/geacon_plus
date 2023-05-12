@@ -40,6 +40,7 @@ const (
 	CMD_TYPE_LIST_NETWORK              = 48
 	CMD_TYPE_MAKE_TOKEN                = 49
 	CMD_TYPE_PORT_FORWARD              = 50
+	CMD_TYPE_PORT_FORWARD_STOP         = 51
 	CMD_TYPE_FILE_BROWSE               = 53
 	CMD_TYPE_MAKEDIR                   = 54
 	CMD_TYPE_DRIVES                    = 55
