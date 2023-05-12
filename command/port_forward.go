@@ -1,24 +1,18 @@
 package command
 
 import (
+	"errors"
 	"io"
 	"main/packet"
 	"main/util"
 	"net"
-	"strings"
 	"sync"
 )
 
 var listenerMap sync.Map
 
-type Listener struct {
-	listen *net.Listener
-	conns  []*net.Conn
-}
-
 func join(src io.ReadWriteCloser, dst io.ReadWriteCloser) {
 	var wait sync.WaitGroup
-
 	pipe := func(to io.ReadWriteCloser, from io.ReadWriteCloser) {
 		defer to.Close()
 		defer from.Close()
@@ -26,20 +20,16 @@ func join(src io.ReadWriteCloser, dst io.ReadWriteCloser) {
 		defer wait.Done()
 		_, err := io.CopyBuffer(to, from, buf)
 		if err != nil {
-			if strings.HasSuffix(err.Error(), "use of closed network connection") {
-				return
+			if !errors.Is(err, net.ErrClosed) {
+				packet.ErrorMessage(err.Error())
 			}
-
-			packet.ErrorMessage(err.Error())
 			return
 		}
 	}
-
 	wait.Add(2)
 	go pipe(src, dst)
 	go pipe(dst, src)
 	wait.Wait()
-	util.Println("join finished")
 }
 
 func portForwardServe(port string, target string) error {
@@ -48,16 +38,14 @@ func portForwardServe(port string, target string) error {
 		return err
 	}
 	packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("Listening on 0.0.0.0: %s, forward to %s", port, target)))
-	l := Listener{listen: &listen}
-	listenerMap.Store(port, &l)
+	listenerMap.Store(port, &listen)
 	go func() {
 		for {
 			srcConn, err := listen.Accept()
 			if err != nil {
-				if strings.HasSuffix(err.Error(), "use of closed network connection") {
-					return
+				if !errors.Is(err, net.ErrClosed) {
+					packet.ErrorMessage(err.Error())
 				}
-				packet.ErrorMessage(err.Error())
 				return
 			}
 			dstConn, err := net.Dial("tcp", target)
@@ -65,23 +53,19 @@ func portForwardServe(port string, target string) error {
 				packet.ErrorMessage(err.Error())
 				return
 			}
-			l.conns = append(l.conns, &srcConn, &dstConn)
 			go join(srcConn, dstConn)
 		}
 	}()
 	return nil
 }
 
-func portForwardStop(port string) {
+func portForwardStop(port string) error {
 	if value, ok := listenerMap.LoadAndDelete(port); ok {
-		if listener, ok := value.(*Listener); ok {
-			(*listener.listen).Close()
-			for _, conn := range listener.conns {
-				(*conn).Close()
-			}
+		if listener, ok := value.(*net.Listener); ok {
+			_ = (*listener).Close()
 			packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("stop portforward at %s success", port)))
-			return
+			return nil
 		}
 	}
-	packet.ErrorMessage(util.Sprintf("no portforward on %s", port))
+	return errors.New(util.Sprintf("no portforward on %s", port))
 }

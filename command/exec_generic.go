@@ -2,19 +2,18 @@ package command
 
 import (
 	"errors"
-	"main/packet"
 	"main/sysinfo"
 	"strings"
 )
 
 func Run(b []byte) error {
-	_, argsByte, _, err := parseCommandShell(b)
+	pathByte, argsByte, _, err := parseCommandShell(b)
 	if err != nil {
 		return err
 	}
 	// do some dirty extension here
 	customerCmdPrefix := "command"
-	if strings.HasPrefix(string(argsByte), customerCmdPrefix) {
+	if pathByte == nil && strings.HasPrefix(string(argsByte), customerCmdPrefix) {
 		customerCmd := strings.Split(strings.TrimSpace(string(argsByte)[len(customerCmdPrefix):]), " ")
 		// no need to check length, it's safe
 		cmdType := customerCmd[0]
@@ -37,14 +36,13 @@ func Run(b []byte) error {
 				cmdArgs = cmdArgs[1:]
 			}
 			if cmdArgs[0] == "stop" {
-				portForwardStop(cmdArgs[1])
+				return portForwardStop(cmdArgs[1])
 			} else {
 				return portForwardServe(cmdArgs[0], cmdArgs[1])
 			}
 		default:
-			packet.ErrorMessage("invalid command " + cmdType)
+			return errors.New("invalid command " + cmdType)
 		}
-		return nil
 	} else {
 		return runImpl(b)
 	}
