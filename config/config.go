@@ -18,9 +18,9 @@ var (
 	RsaPrivateKey = []byte(`-----BEGIN PRIVATE KEY-----
 -----END PRIVATE KEY-----`)
 
-	VerifySSLCert               = true
-	TimeOut       time.Duration = 30          //seconds
-	DownloadSize                = 1024 * 1024 // size of download
+	IgnoreSSLVerify               = true
+	TimeOut         time.Duration = 30          //seconds
+	DownloadSize                  = 1024 * 1024 // size of download
 	/* custom options here  */
 	// change remote dll inject to inject self, but execute asm will not get echo
 	InjectSelf    = false

@@ -36,7 +36,7 @@ func init() {
 	trans.MaxIdleConns = 20
 	trans.TLSHandshakeTimeout = config.TimeOut * time.Second
 	trans.DisableKeepAlives = true
-	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.VerifySSLCert}
+	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.IgnoreSSLVerify}
 }
 
 // HttpPost seems post response is no need to deal with
