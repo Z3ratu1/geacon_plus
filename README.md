@@ -56,6 +56,12 @@ make token很怪，用LOGON32_LOGON_BATCH输什么都密码错误，用LOGON32_L
 ### 后渗透功能
 支持内存加载PowerShell module，支持使用反射DLL注入或go语言内存执行C#
 
+### DNS beacon
+在config/config.go中修改dns config，填入域名和nameserver ip 端口(可以是非53端口)，并配置对应的dns listener即可
+注意域名是`.example.com.`，前后两个点都不能忽略。
+
+在c2profile.go中添加了域名前缀配置，该值为默认配置，若使用自定义profile需根据profile进行修改。
+
 ## TODO
 转到issue里了
 
