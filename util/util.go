@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"main/config"
 	"math/rand"
+	"time"
 )
 
 func BytesCombine(pBytes ...[]byte) []byte {
@@ -115,4 +117,14 @@ func DecryptField(decryptTypes []string, data []byte) ([]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+func Sleep() {
+	sleepTime := config.WaitTime
+	if config.Jitter != 0 {
+		random := sleepTime * config.Jitter / 100
+		sleepTime += rand.Intn(random*2) - random
+
+	}
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 }

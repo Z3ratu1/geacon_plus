@@ -5,7 +5,6 @@ import (
 	"main/config"
 	"main/packet"
 	"main/util"
-	"math/rand"
 	"os"
 	"time"
 )
@@ -170,13 +169,7 @@ func ChangeSleep(b []byte) {
 }
 
 func Sleep() {
-	sleepTime := config.WaitTime
-	if config.Jitter != 0 {
-		random := sleepTime * config.Jitter / 100
-		sleepTime += rand.Intn(random*2) - random
-
-	}
-	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+	util.Sleep()
 }
 
 func Pause(b []byte) {

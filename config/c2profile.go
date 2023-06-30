@@ -10,6 +10,7 @@ var (
 	// SpawnToX64 post-ex.spawnto_x64
 	SpawnToX64 = "C:\\windows\\sysnative\\notepad.exe"
 
+	// http c2 config
 	// MetaDataField http-get.client.metadata.header
 	MetaDataField = "Cookie"
 	// GetMetaEncryptType http-get.client.metadata
@@ -58,8 +59,11 @@ var (
 		"Accept-Encoding": "gzip, deflate",
 	}
 
-	// WaitTime unit Millisecond
-	WaitTime = 5 * 1000
-	// Jitter unit percent
-	Jitter = 0
+	// DNS c2 config
+	DnsMaskString      = "0.0.0.0"
+	DnsTXT             = "api."
+	DnsA               = "cdn."
+	DnsAAA             = "www6."
+	PostResultPrefix   = "post."
+	PostMetadataPrefix = "www."
 )

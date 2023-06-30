@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"github.com/imroc/req"
 	"main/config"
 	"main/util"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
-	"time"
-
-	"github.com/imroc/req"
 )
 
 var (
@@ -21,22 +19,24 @@ var (
 
 // init was called at beginning of the package
 func init() {
-	httpRequest.SetTimeout(config.TimeOut * time.Second)
-	if config.ProxyUrl != "" {
-		err := httpRequest.SetProxyUrl(config.ProxyUrl)
-		if err != nil {
-			ErrorMessage(util.Sprintf("error proxy url: %s", config.ProxyUrl))
-			os.Exit(1)
+	if !config.IsDNS {
+		httpRequest.SetTimeout(config.TimeOut)
+		if config.ProxyUrl != "" {
+			err := httpRequest.SetProxyUrl(config.ProxyUrl)
+			if err != nil {
+				ErrorMessage(util.Sprintf("error proxy url: %s", config.ProxyUrl))
+				os.Exit(1)
+			}
 		}
+		if config.DomainFrontHost != "" {
+			config.HttpHeaders["Host"] = config.DomainFrontHost
+		}
+		trans, _ := httpRequest.Client().Transport.(*http.Transport)
+		trans.MaxIdleConns = 20
+		trans.TLSHandshakeTimeout = config.TimeOut
+		trans.DisableKeepAlives = true
+		trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.IgnoreSSLVerify}
 	}
-	if config.DomainFrontHost != "" {
-		config.HttpHeaders["Host"] = config.DomainFrontHost
-	}
-	trans, _ := httpRequest.Client().Transport.(*http.Transport)
-	trans.MaxIdleConns = 20
-	trans.TLSHandshakeTimeout = config.TimeOut * time.Second
-	trans.DisableKeepAlives = true
-	trans.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.IgnoreSSLVerify}
 }
 
 // HttpPost seems post response is no need to deal with
@@ -60,7 +60,7 @@ func HttpPost(data []byte) *req.Resp {
 		resp, err := httpRequest.Post(url, data, headers, param)
 		if err != nil {
 			util.Printf("!error: %v\n", err)
-			time.Sleep(time.Second * time.Duration(config.WaitTime))
+			util.Sleep()
 			continue
 		} else {
 			if resp.Response().StatusCode == http.StatusOK {
