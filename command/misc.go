@@ -22,6 +22,7 @@ const (
 	CMD_TYPE_DOWNLOAD                  = 11
 	CMD_TYPE_EXECUTE                   = 12
 	CMD_TYPE_SPAWN_TOX86               = 13 // only supply target, don't supply dll
+	CMD_TYPE_CANCEL                    = 19
 	CMD_TYPE_GET_UID                   = 27
 	CMD_TYPE_REV2SELF                  = 28
 	CMD_TYPE_TIMESTOMP                 = 29
