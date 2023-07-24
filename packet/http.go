@@ -93,8 +93,8 @@ func HttpGet(data []byte) ([]byte, error) {
 		return nil, err
 	} else {
 		if resp.Response().StatusCode == http.StatusOK {
-			payload, err2 := resolveServerResponse(resp)
-			if err2 != nil {
+			payload, err := resolveServerResponse(resp)
+			if err != nil {
 				return nil, err
 			}
 			return payload, nil
