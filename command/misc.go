@@ -2,12 +2,15 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"main/config"
 	"main/packet"
 	"main/util"
 	"os"
 	"time"
 )
+
+var defaultCtx = context.Background()
 
 // most of the interaction can be found in beacon.Taskbeacon
 const (

