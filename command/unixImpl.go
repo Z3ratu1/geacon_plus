@@ -4,7 +4,6 @@ package command
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"main/config"
 	"main/packet"
@@ -117,7 +116,6 @@ func RunAsync(cmd *exec.Cmd) error {
 				packet.PushResult(packet.CALLBACK_OUTPUT, outBuf[:m])
 			}
 			if outErr != nil {
-				fmt.Println("outErr:" + outErr.Error())
 				if outErr != io.EOF {
 					packet.ErrorMessage(outErr.Error())
 				}
