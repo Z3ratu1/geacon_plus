@@ -32,7 +32,7 @@ func PaddingWithA(rawData []byte) []byte {
 	return newBuf.Bytes()
 }
 
-func AesCBCEncrypt(rawData, key []byte) ([]byte, error) {
+func AesCBCEncrypt(rawData []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
@@ -44,14 +44,14 @@ func AesCBCEncrypt(rawData, key []byte) ([]byte, error) {
 	return cipherText, nil
 }
 
-func AesCBCDecrypt(encryptData, key []byte) ([]byte, error) {
+func AesCBCDecrypt(encryptData []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
 	}
 	blockSize := block.BlockSize()
 	// seems need to padding if base64 payload was returned?
-	//encryptData = PaddingWithA(encryptData)
+	encryptData = PaddingWithA(encryptData)
 	if len(encryptData) < blockSize {
 		panic("ciphertext too short")
 	}
