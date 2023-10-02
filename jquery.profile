@@ -420,7 +420,7 @@ http-config {
     header "Keep-Alive" "timeout=10, max=100";
     header "Connection" "Keep-Alive";
     # Use this option if your teamserver is behind a redirector
-    # set trust_x_forwarded_for "true";
+    set trust_x_forwarded_for "true";
 }
 
 ################################################
