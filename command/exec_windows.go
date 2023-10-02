@@ -145,6 +145,8 @@ func Exec(b []byte) error {
 // and cmd run doesn't give path, as set path to null and args as commandline
 func runNative(path string, args string) error {
 	args = strings.Trim(args, " ")
+	// change /C to /c
+	args = strings.Replace(args, "/C", "/c", 1)
 	var (
 		sI windows.StartupInfo
 		pI windows.ProcessInformation
