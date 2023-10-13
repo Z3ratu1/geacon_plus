@@ -41,13 +41,11 @@ func main() {
 					respByte := resp
 					// hmacHash, useless
 					_ = respByte[totalLen-util.HmacHashLen:]
-					//util.Printf("hmac hash: %v\n", hmacHash)
 					// TODO check the hmachash
 					restBytes := respByte[:totalLen-util.HmacHashLen]
 					decrypted := packet.DecryptPacket(restBytes)
 					// first 4 bytes timestamp,useless
 					_ = decrypted[:4]
-					//util.Printf("timestamp: %v\n", timestamp)
 					// 4 bytes data length
 					lenBytes := decrypted[4:8]
 					packetLen := binary.BigEndian.Uint32(lenBytes)

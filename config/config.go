@@ -44,5 +44,6 @@ var (
 	// WaitTime unit Millisecond
 	WaitTime = 5 * 1000
 	// Jitter unit percent
-	Jitter = 0
+	Jitter     = 0
+	MaxRetries = 30
 )

