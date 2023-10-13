@@ -25,6 +25,7 @@ func init() {
 			err := httpRequest.SetProxyUrl(config.ProxyUrl)
 			if err != nil {
 				ErrorMessage(util.Sprintf("error proxy url: %s", config.ProxyUrl))
+				// may not delete self?
 				os.Exit(1)
 			}
 		}

@@ -6,7 +6,6 @@ import (
 	"main/config"
 	"main/packet"
 	"main/util"
-	"os"
 	"time"
 )
 
@@ -184,18 +183,18 @@ func Pause(b []byte) {
 	time.Sleep(time.Duration(pauseTime) * time.Millisecond)
 }
 
-func TimeCheck(current time.Time) {
+func TimeCheck(current time.Time) bool {
 	if config.EndTime != "" {
 		endTime, err := time.ParseInLocation(config.TimeLayout, config.EndTime, time.Local)
 		if err != nil {
-			return
+			return false
 		}
 		if current.After(endTime) {
-			util.Println("Time exceed, destroy self")
-			DeleteSelf()
-			os.Exit(0)
+			util.Println("Time exceed, exit")
+			return true
 		}
 	}
+	return false
 }
 
 func DeleteSelf() {
